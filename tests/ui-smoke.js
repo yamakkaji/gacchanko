@@ -1,0 +1,57 @@
+(async()=>{
+ const P=window.gacchanko, checks=[];
+ const check=(value,message)=>{if(!value)throw new Error(message);checks.push(message);};
+ try{
+  await window.gacchankoReady;
+  check(document.querySelector('#canvas'),'canvas is mounted');
+  P.mutate(()=>{
+   P.graph.name='UI smoke test';
+   P.graph.nodes.push(P.makeNode({id:'source',name:'Image source',kind:'directory'}, {x:30,y:80}));
+   P.graph.nodes.push(P.makeNode({id:'target',name:'Decision model',kind:'model'}, {x:400,y:80}));
+  });
+  P.fit();
+  check(document.querySelectorAll('.node').length===2,'nodes rendered');
+  const out=document.querySelector('[data-node="source"] .port.out');
+  const input=document.querySelector('[data-node="target"] .port.in');
+  out.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));
+  input.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,button:0}));
+  check(P.graph.edges.length===1,'port gesture creates connection');
+  const edge=P.graph.edges[0];
+  const intent=document.querySelector('#edge-intent');
+  intent.value='Send a screenshot as PNG and record the response.';
+  intent.dispatchEvent(new Event('change',{bubbles:true}));
+  check(P.graph.edges[0].intent.includes('PNG'),'edge intent editable');
+  const mode=document.querySelector('#edge-mode');mode.value='request';mode.dispatchEvent(new Event('change',{bubbles:true}));
+  check(document.querySelector('.edge-line').hasAttribute('marker-start'),'bidirectional connection rendered');
+  const state=await P.call('testCreate',{graph:P.graph});P.cleanState(state);
+  check(P.root.endsWith('.gacchanko'),'native project created');
+  P.select('node','source');
+  const name=document.querySelector('#node-name');name.value='Screenshot source';name.dispatchEvent(new Event('change',{bubbles:true}));
+  await P.save(false);
+  const reloaded=await P.call('reload');
+  check(reloaded.project.nodes[0].name==='Screenshot source','inspector edit persisted');
+  P.cleanState(reloaded);
+  await P.call('testReport');await P.poll();
+  check(P.status(edge.id)==='verified','agent report reflected');
+  P.select('edge',edge.id);
+  check(document.querySelector('.status-card.verified'),'verified state displayed');
+  const changed=document.querySelector('#edge-intent');changed.value='Use JPEG instead';changed.dispatchEvent(new Event('change',{bubbles:true}));
+  await P.save(false);await P.poll();P.render();
+  check(P.status(edge.id)==='stale','changed intent invalidates report');
+  check(document.querySelector('.status-card.stale'),'stale state displayed');
+  const prompt=await P.call('copyPrompt',{edgeID:edge.id});
+  check(prompt.includes('AGENT_BRIEF.md')&&prompt.includes(edge.id),'handoff contains project and selected edge');
+  await P.addPaths([P.root],{x:200,y:350});
+  check(P.graph.nodes.length===3&&P.graph.nodes[2].path===P.root,'local directory inspection and addition');
+  const nodeBefore=P.graph.nodes[0].x;
+  const node=document.querySelector('[data-node="source"]');
+  node.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,clientX:150,clientY:200}));
+  window.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,clientX:200,clientY:230}));
+  window.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:200,clientY:230}));
+  check(P.graph.nodes[0].x!==nodeBefore,'node drag moves position');
+  P.undo();check(P.graph.nodes[0].x===nodeBefore,'undo restores node position');
+  P.redo();check(P.graph.nodes[0].x!==nodeBefore,'redo restores movement');
+  await P.save(false);
+  await P.call('testFinish',{ok:true,checks,project:P.root});
+ }catch(error){await P.call('testFinish',{ok:false,checks,error:error.stack||String(error)});}
+})();

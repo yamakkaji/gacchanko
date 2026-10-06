@@ -1,0 +1,7 @@
+.build/
+dist/
+.qa/
+.DS_Store
+tests/*-result.json
+tests/*-result.txt
+tests/ui-project-*.gacchanko/

@@ -6,6 +6,8 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const uid = prefix => prefix + '_' + crypto.randomUUID().slice(0, 8);
 const host = window.gacchankoHost;
 const native = host.available;
+const appearance=window.gacchankoAppearance;
+let edgeAppearance=appearance.load();
 const call = (command, args={}) => host.request(command,args);
 const emptyGraph = () => ({schemaVersion:1,name:'Untitled project',description:'',nodes:[],edges:[]});
 let graph=emptyGraph(), root='', revision='', reports={}, fingerprints={}, dirty=false, selected=null;
@@ -82,34 +84,12 @@ function beginDrag(event,state){
   if(event.pointerId!==undefined)try{$('#canvas').setPointerCapture(event.pointerId);}catch{}
   event.preventDefault();
 }
-// Sample the same cubic as the edge. Arc distance keeps arrowheads clear of ports.
-function directionArrows(a,b){
-  const bend=Math.max(70,Math.abs(b.x-a.x)*.5),samples=[];
-  let length=0,previous=a;
-  for(let i=0;i<=64;i++){
-    const t=i/64,u=1-t;
-    const x=u*u*u*a.x+3*u*u*t*(a.x+bend)+3*u*t*t*(b.x-bend)+t*t*t*b.x;
-    const y=u*u*u*a.y+3*u*u*t*a.y+3*u*t*t*b.y+t*t*t*b.y;
-    length+=Math.hypot(x-previous.x,y-previous.y);
-    samples.push({t,x,y,length});previous={x,y};
-  }
-  const distances=[Math.max(length*.6,length-22/view.zoom)];
-  if(length*view.zoom>280)distances.unshift(length*.25);
-  return distances.map(distance=>{
-    const hi=samples.findIndex(p=>p.length>=distance),right=samples[Math.max(1,hi)],left=samples[Math.max(0,hi-1)];
-    const fraction=(distance-left.length)/(right.length-left.length||1),t=left.t+(right.t-left.t)*fraction,u=1-t;
-    const x=left.x+(right.x-left.x)*fraction,y=left.y+(right.y-left.y)*fraction;
-    const dx=3*u*u*bend+6*u*t*(b.x-a.x-2*bend)+3*t*t*bend,dy=6*u*t*(b.y-a.y);
-    const angle=Math.atan2(dy,dx)*180/Math.PI;
-    return `<path class="edge-direction" d="M -11 -5 L 0 0 L -11 5 L -8 0 Z" transform="translate(${x} ${y}) rotate(${angle}) scale(${1/view.zoom})"/>`;
-  }).join('');
-}
 function renderEdges(){
-  $('#edge-paths').innerHTML=graph.edges.map(e=>{
+  $('#edge-paths').innerHTML=graph.edges.map((e,index)=>{
     const a=portPoint(e.source,e.sourcePort,'out'),b=portPoint(e.target,e.targetPort,'in');
-    const x=(a.x+b.x)/2,y=(a.y+b.y)/2, label=e.label||'接続', width=Math.min(230,Math.max(85,[...label].length*7+22));
-    const colour=selected?.type==='edge'&&selected.id===e.id?'#99e7ca':{verified:'#8bcbb2',implemented:'#b2a0e7',stale:'#d6a567',blocked:'#d49a87'}[status(e.id)]||'#a8a2d6';
-    return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${curve(a,b)}"/><path class="edge-line ${e.mode==='request'?'request':''}" style="stroke:${colour}" d="${curve(a,b)}" ${e.mode==='request'?'marker-start="url(#arrow)"':''}/>${directionArrows(a,b)}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><text class="edge-label" x="${x}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
+    const x=(a.x+b.x)/2,y=(a.y+b.y)/2, label=(e.mode==='request'?'↔ ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
+    const colour={verified:'#8bcbb2',implemented:'#b2a0e7',stale:'#d6a567',blocked:'#d49a87'}[status(e.id)]||'#a8a2d6';
+    return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${curve(a,b)}"/>${appearance.render(a,b,{settings:edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
   }).join('')+(connecting?`<path class="edge-line" style="stroke:#99e7ca;stroke-dasharray:5 4" d="${curve(portPoint(connecting.node,connecting.port,'out'),connecting.point)}"/>`:'');
   $$('.edge-group').forEach(el=>el.addEventListener('pointerdown',e=>{if(e.button!==0||spacePressed)return;e.stopPropagation();e.preventDefault();$('#canvas').focus({preventScroll:true});select('edge',el.dataset.edge);}));
 }
@@ -148,7 +128,6 @@ function transform(){
   $('#zoom-label').textContent=Math.round(view.zoom*100)+'%';
   $('#canvas').style.backgroundSize=`${22*view.zoom}px ${22*view.zoom}px`;
   $('#canvas').style.backgroundPosition=`${view.x}px ${view.y}px`;
-  $('#arrow').setAttribute('markerWidth',10/view.zoom);$('#arrow').setAttribute('markerHeight',10/view.zoom);
   renderEdges();
 }
 function canvasPoint(clientX,clientY){const r=$('#canvas').getBoundingClientRect();return{x:(clientX-r.left-view.x)/view.zoom,y:(clientY-r.top-view.y)/view.zoom};}
@@ -212,6 +191,29 @@ function renderInspector(force=false){
     if($('#copy-location'))$('#copy-location').onclick=safe(async()=>{await call('copy',{text:root});toast('パスをコピーしました。');});
   }
   if($('#delete-selected'))$('#delete-selected').onclick=safe(deleteSelected);
+}
+function appearanceSettings(){
+  const s=edgeAppearance;
+  const options=(values,current)=>Object.entries(values).map(([value,label])=>`<option value="${value}" ${value===current?'selected':''}>${label}</option>`).join('');
+  const colour=(name,label)=>`<label class="field"><span>${label}</span><input type="color" data-appearance="${name}" value="${s[name]}"></label>`;
+  const slider=(name,label,min,max,step=1)=>`<label class="field"><span>${label} <output data-output="${name}">${s[name]}</output></span><input type="range" data-appearance="${name}" min="${min}" max="${max}" step="${step}" value="${s[name]}"></label>`;
+  modal(`<h2>設定</h2><span class="eyebrow">エッジの表示</span><div class="edge-preview"><div><span>out</span><span>in</span></div><svg id="appearance-preview" viewBox="0 0 440 110" role="img" aria-label="出力から入力へのエッジ表示プレビュー"></svg></div><label class="field"><span>表示方式</span><select data-appearance="style">${options({gradient:'グラデーション',pattern:'模様',both:'グラデーション＋模様',solid:'状態色（従来の表示）'},s.style)}</select></label><div class="appearance-colours">${colour('source','out 側の色')}${colour('target','in 側の色')}${colour('patternColour','模様の色')}</div><label class="field"><span>模様</span><select data-appearance="pattern">${options({chevrons:'山形 › › ›',taper:'先細りのストライプ'},s.pattern)}</select></label><div class="field-row">${slider('width','線の太さ',1,8,.5)}${slider('spacing','模様の間隔',20,120)}</div>${slider('size','模様の大きさ',3,12)}<label class="appearance-checkbox"><input type="checkbox" data-appearance="arrows" ${s.arrows?'checked':''}>矢印を表示</label><div class="modal-actions"><button type="button" id="reset-appearance">初期設定に戻す</button><button class="primary">閉じる</button></div>`);
+  const preview=()=>{
+    $('#appearance-preview').innerHTML=appearance.render({x:18,y:80},{x:420,y:28},{settings:edgeAppearance,id:'settings-preview'});
+    const gradient=['gradient','both'].includes(edgeAppearance.style),pattern=['pattern','both'].includes(edgeAppearance.style);
+    for(const name of ['pattern','patternColour','spacing','size'])$(`[data-appearance="${name}"]`).disabled=!pattern;
+    $('[data-appearance="target"]').disabled=!gradient;
+    $('[data-appearance="source"]').disabled=edgeAppearance.style==='solid';
+    $$('[data-output]').forEach(el=>el.value=edgeAppearance[el.dataset.output]);
+  };
+  $$('[data-appearance]').forEach(input=>input.addEventListener('input',()=>{
+    const value=input.type==='checkbox'?input.checked:input.type==='range'?Number(input.value):input.value;
+    edgeAppearance=appearance.normalize({...edgeAppearance,[input.dataset.appearance]:value});
+    try{appearance.save(edgeAppearance);}catch{toast('表示設定を保存できませんでした。',true);}
+    preview();renderEdges();
+  }));
+  $('#reset-appearance').onclick=()=>{edgeAppearance={...appearance.defaults};try{appearance.save(edgeAppearance);}catch{toast('表示設定を保存できませんでした。',true);}appearanceSettings();renderEdges();};
+  preview();
 }
 function modal(html){const d=$('#modal');$('#modal-content').innerHTML=html;if(!d.open)d.showModal();}
 async function confirmChoice(message){return new Promise(resolve=>{
@@ -311,6 +313,7 @@ $('#project-settings').onclick=()=>{selected=null;render();};$('#reveal-project'
 $('#open-project').onclick=safe(async()=>{document.activeElement?.blur();if(dirty){if(root){if(!await save(true))return;}else if(!await confirmChoice('未保存のグラフを破棄して別のプロジェクトを開きます。'))return;}const state=await call('openProject');if(state){clearTimeout(saveTimer);cleanState(state);fit();}});
 $('#reload-project').onclick=safe(async()=>{if(dirty&&!await confirmChoice('未保存の編集を破棄して、ディスクのグラフを読み込みます。必要なら先に JSON 書き出しで退避してください。'))return;clearTimeout(saveTimer);cleanState(await call('reload'));fit();});
 $('#export-draft').onclick=safe(()=>call('exportJSON',{graph}));
+$('#appearance-settings').onclick=appearanceSettings;
 $('#show-help').onclick=()=>modal(`<h2>ヘルプ</h2><p>Shift＋クリック：追加選択 / 解除<br>空白をドラッグ：四角で囲ったノードを選択<br>Shift＋範囲選択：選択に追加<br>Space＋ドラッグ / 中ボタンドラッグ：画面を移動<br>Delete：選択したノード・接続を削除</p><p>① フォルダを配置し、右の出力から左の入力へ線を引きます。<br>② 線を選んで、つなぎたい内容を記入します。<br>③ 保存して「エージェントに渡す」を押します。<br>④ コピーした依頼文を、ローカルファイルにアクセスできる ChatGPT / Codex / Claude Code のチャットへ貼り付けます。</p><pre>graph.json                  設計の正本\nAGENT_BRIEF.md              エージェントへの指示\nconnections/&lt;id&gt;/SPEC.md    接続ごとの仕様\nimplementations/&lt;id&gt;/       生成コードの保存先\nreports/&lt;id&gt;.json          実装・検証の報告\ngraph.mmd                   Mermaid のグラフ</pre><p>保存済みプロジェクトの編集は自動保存されます。エージェントのレポートは約2秒ごとに読み込みます。元のリポジトリの更新は自動検知しないため、コードを変えた際は再検証を依頼してください。</p><div class="modal-actions"><button class="primary">わかりました</button></div>`);
 window.addEventListener('keydown',e=>{
   const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'');

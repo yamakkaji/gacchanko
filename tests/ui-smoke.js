@@ -1,8 +1,11 @@
 (async()=>{
- const P=window.gacchanko, checks=[];
+ const P=window.gacchanko, checks=[],originalAppearance=window.gacchankoAppearance.load();
  const check=(value,message)=>{if(!value)throw new Error(message);checks.push(message);};
  try{
   await window.gacchankoReady;
+  document.querySelector('#appearance-settings').click();
+  document.querySelector('#reset-appearance').click();
+  document.querySelector('#modal').close();
   check(document.querySelector('#canvas'),'canvas is mounted');
   P.mutate(()=>{
    P.graph.name='UI smoke test';
@@ -22,7 +25,7 @@
   intent.dispatchEvent(new Event('change',{bubbles:true}));
   check(P.graph.edges[0].intent.includes('PNG'),'edge intent editable');
   const mode=document.querySelector('#edge-mode');mode.value='request';mode.dispatchEvent(new Event('change',{bubbles:true}));
-  check(document.querySelector('.edge-line').hasAttribute('marker-start'),'bidirectional connection rendered');
+  check(document.querySelector('.edge-return'),'bidirectional connection rendered');
   const state=await P.call('testCreate',{graph:P.graph});P.cleanState(state);
   check(P.root.endsWith('.gacchanko'),'native project created');
   P.select('node','source');
@@ -126,7 +129,38 @@
   check(P.graph.nodes.length===1&&P.graph.nodes[0].id===third&&P.graph.edges.length===0,'group deletion removes selected nodes and attached edges');
   P.undo();
   check(P.graph.nodes.length===3&&P.graph.edges.length===1,'one undo restores deleted group and connection');
+  const graphBeforeAppearance=JSON.stringify(P.graph),saveStateBefore=document.querySelector('#save-state').textContent;
+  const settingsButton=document.querySelector('#appearance-settings');settingsButton.click();
+  const setting=(name,value)=>{const input=document.querySelector(`[data-appearance="${name}"]`);if(input.type==='checkbox')input.checked=value;else input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));};
+  check(document.querySelector('#appearance-preview .edge-gradient-segment'),'settings preview uses the graph edge renderer');
+  setting('style','both');setting('source','#123456');setting('target','#fedcba');setting('patternColour','#00ff88');
+  const stops=[...document.querySelectorAll('#edge-paths stop')];
+  check(stops[0].getAttribute('stop-color')==='#123456'&&stops.at(-1).getAttribute('stop-color')==='#fedcba','custom endpoint colours immediately update the canvas gradient');
+  check(document.querySelector('#edge-paths .edge-pattern path').getAttribute('stroke')==='#00ff88','custom pattern colour is applied');
+  setting('pattern','taper');
+  check(document.querySelector('#edge-paths .edge-pattern path').getAttribute('fill')==='#00ff88','pattern can switch to tapered stripes');
+  setting('width',5);setting('size',9);setting('spacing',25);
+  const denseCount=document.querySelectorAll('#edge-paths .edge-pattern').length;
+  setting('spacing',120);
+  check(document.querySelectorAll('#edge-paths .edge-pattern').length<denseCount,'pattern spacing changes the number of marks');
+  check(Math.abs(parseFloat(document.querySelector('#edge-paths .edge-line').style.strokeWidth)*transform()[2]-5)<1e-8,'custom line width remains constant on screen');
+  setting('arrows',false);
+  check(!document.querySelector('#edge-paths .edge-direction')&&document.querySelector('#edge-paths .edge-return'),'forward arrows can hide without losing request-response indication');
+  setting('style','pattern');
+  check(!document.querySelector('#edge-paths .edge-gradient-segment')&&document.querySelector('#edge-paths .edge-pattern'),'pattern-only style removes the gradient');
+  setting('style','solid');
+  check(!document.querySelector('#edge-paths .edge-pattern')&&!document.querySelector('#edge-paths .edge-gradient-segment')&&document.querySelector('#edge-paths .edge-status'),'status-colour style keeps edge status visible');
+  setting('style','both');
+  const stored=window.gacchankoAppearance.load();
+  check(stored.source==='#123456'&&stored.target==='#fedcba'&&stored.width===5&&stored.arrows===false,'appearance choices are persisted independently of the graph');
+  document.querySelector('#modal').close();settingsButton.click();
+  check(document.querySelector('[data-appearance="source"]').value==='#123456'&&document.querySelector('[data-appearance="pattern"]').value==='taper','reopening settings preserves choices');
+  check(JSON.stringify(P.graph)===graphBeforeAppearance&&document.querySelector('#save-state').textContent===saveStateBefore,'appearance changes do not edit the graph or its save state');
+  document.querySelector('#reset-appearance').click();
+  check(document.querySelector('[data-appearance="source"]').value===window.gacchankoAppearance.defaults.source&&window.gacchankoAppearance.load().width===3,'reset restores and persists appearance defaults');
+  document.querySelector('#modal').close();
   await P.save(false);
+  window.gacchankoAppearance.save(originalAppearance);
   await P.call('testFinish',{ok:true,checks,project:P.root});
- }catch(error){await P.call('testFinish',{ok:false,checks,error:error.stack||String(error)});}
+ }catch(error){window.gacchankoAppearance.save(originalAppearance);await P.call('testFinish',{ok:false,checks,error:error.stack||String(error)});}
 })();

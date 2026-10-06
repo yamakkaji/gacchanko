@@ -7,6 +7,7 @@
 | 部分 | 現行の実装 | Tauri へ移行する場合 |
 |---|---|---|
 | ノード・エッジ編集、選択、パン、ズーム、Undo、インスペクター | `web/app.js`、HTML、CSS | 画面側は継続利用 |
+| エッジの表示設定・描画 | `web/appearance.js`、WebView の localStorage | 共通描画を継続利用。保存領域の移行時は設定キーも移行 |
 | ホストとの通信 | `web/bridge.js` 内の Swift アダプター | 同じインターフェースの Tauri アダプターへ置換 |
 | ウィンドウ、ファイルダイアログ、クリップボード、ドロップ、終了確認 | `Sources/main.swift` | Tauri / Rust 側で実装 |
 | グラフ検証、保存、競合検知、仕様書生成、レポートの読み込み | `Sources/Project.swift` | Rust の独立した保存ロジックへ移植 |

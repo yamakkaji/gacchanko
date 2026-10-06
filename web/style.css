@@ -8,3 +8,18 @@
 .edge-line { stroke-width: 2; vector-effect: non-scaling-stroke; }
 .edge-hit { vector-effect: non-scaling-stroke; }
 .edge-direction { fill: currentColor; stroke: #14171d; stroke-width: 1; stroke-linejoin: round; pointer-events: none; }
+
+.edge-gradient-segment { fill: none; stroke-linecap: round; pointer-events: none; }
+.edge-selection { fill: none; stroke: var(--teal); opacity: .3; pointer-events: none; }
+.edge-pattern, .edge-return { pointer-events: none; stroke-linejoin: round; stroke-linecap: round; }
+.edge-preview { margin-top: 16px; border: 1px solid var(--line); background: #111318; border-radius: 8px; padding: 12px; }
+.edge-preview > div { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+.edge-preview svg { display: block; width: 100%; overflow: visible; }
+.appearance-colours { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+.appearance-colours input { height: 38px; padding: 4px; cursor: pointer; }
+[data-appearance]:disabled { opacity: .35; cursor: default; }
+[data-output] { float: right; font-variant-numeric: tabular-nums; }
+input[type="range"] { padding: 0; accent-color: var(--teal); }
+.appearance-checkbox { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 12px; }
+.appearance-checkbox input { width: auto; accent-color: var(--teal); }
+dialog { max-height: 90vh; overflow-y: auto; }

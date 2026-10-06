@@ -150,7 +150,7 @@ final class ProjectStore {
         - Implement the requested connections using your existing coding session. No LLM API key or background agent is required by gacchanko.
         - Put integration code under `implementations/<edge-id>/`, and shared integration code under `implementations/shared/`. Preserve source repositories unless the user requests edits.
         - Repositories and URLs are references. A remote URL has not been cloned. Resolve missing paths with the user; never invent APIs, credentials, outputs, or successful tests.
-        - Read every active edge specification in `connections/<edge-id>/SPEC.md`. Ask only about ambiguities that materially affect behaviour. Request/response edges include the response on the same connection.
+        - Read the specifications for the requested edges in `connections/<edge-id>/SPEC.md`. If the handoff names one edge, implement only that edge; other edges are context unless explicitly requested. Ask only about ambiguities that materially affect behaviour. Request/response edges include the response on the same connection.
         - The graph describes intent; it is not an executable scheduling specification. Define lifecycle, timing, buffering, and failure behaviour in the implementation where required.
         - Write `reports/<edge-id>.json` atomically, using the fingerprint from that edge's SPEC.md. Format: {"fingerprint":"...","status":"implemented|verified|blocked","summary":"...","files":["implementations/<edge-id>/adapter.py"],"checks":["Actual command and result"]}.
         - `verified` means you actually ran relevant checks. For incomplete work use `blocked` and explain what is missing. Do not claim runtime integration has passed from a syntax check alone.

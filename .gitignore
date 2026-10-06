@@ -5,3 +5,5 @@ dist/
 tests/*-result.json
 tests/*-result.txt
 tests/ui-project-*.gacchanko/
+
+__pycache__/

@@ -18,6 +18,7 @@ func runSelfTests() throws {
     _ = try store.create(temp.appendingPathComponent("project"), graph: graph)
     try check(fm.fileExists(atPath: store.root!.appendingPathComponent("AGENT_BRIEF.md").path), "brief exported")
     try check(fm.fileExists(atPath: store.root!.appendingPathComponent("connections/e1/SPEC.md").path), "edge spec exported")
+    try check(try String(contentsOf: store.root!.appendingPathComponent("AGENT_BRIEF.md"), encoding: .utf8).contains("implement only that edge"), "single-edge handoff scope is explicit")
     let reader = ProjectStore(); _ = try reader.open(store.root!)
     try check(reader.graph?.edges.first?.intent == "Convert JSON", "graph round trip")
     let originalHash = try fingerprint(edge, graph)

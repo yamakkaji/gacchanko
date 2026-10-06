@@ -2,7 +2,7 @@
 // App-local appearance preferences and SVG rendering, independent of the host.
 window.gacchankoAppearance=(()=>{
   const key='gacchanko-edge-appearance-v1';
-  const defaults=Object.freeze({style:'gradient',source:'#56c8ff',target:'#ffa66b',patternColour:'#f5f7ff',pattern:'chevrons',width:3,spacing:55,size:6,arrows:true});
+  const defaults=Object.freeze({style:'gradient',source:'#486080',target:'#9b5479',patternColour:'#294f4a',pattern:'chevrons',width:3,spacing:55,size:6,arrows:true});
   function normalize(value){
     const v=value&&typeof value==='object'?value:{};
     const colour=(name)=>/^#[0-9a-f]{6}$/i.test(v[name])?v[name]:defaults[name];

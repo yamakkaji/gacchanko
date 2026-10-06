@@ -21,9 +21,9 @@
   <div class="left-bottom"><button id="appearance-settings">設定 <span>⚙</span></button><button id="show-help">ヘルプ <span>↗</span></button><button id="reveal-project">プロジェクトを Finder で開く</button></div>
 </aside>
 <section class="canvas-shell">
-  <div class="canvas-top"><div><span class="eyebrow">DESIGN CANVAS</span></div><div class="canvas-badges"><span id="edge-count">0 connections</span><span id="ready-count">0 verified</span></div></div>
+  <div class="canvas-top"><div class="canvas-caption"><span class="window-square" aria-hidden="true"></span><span class="window-title" id="canvas-project-title">Untitled project</span></div><div class="canvas-badges"><span id="edge-count">0 connections</span><span id="ready-count">0 verified</span></div></div>
   <div id="canvas" tabindex="0" aria-label="ノードキャンバス">
-    <div id="world"><svg id="edges"><g id="edge-paths"></g></svg><div id="nodes"></div></div>
+    <div id="world"><svg id="edges"><g id="edge-paths"></g></svg><div id="nodes"></div><svg id="edge-handles"></svg></div>
     <div id="selection-box" hidden></div>
     <div id="empty-state"><div><button class="primary" id="empty-add">＋ フォルダを選ぶ</button><button id="load-example">サンプルを開く</button></div></div>
     <div id="connect-hint" hidden>接続先の入力ポートをクリック · Esc でキャンセル</div>
@@ -33,7 +33,7 @@
   <div id="external-banner" hidden>外部でグラフが更新されました。<button id="reload-project">再読み込み</button><button id="export-draft">未保存分を JSON 書き出し</button></div>
   <footer><span id="status-text"></span></footer>
 </section>
-<aside class="right-panel" id="inspector"></aside>
+<aside class="right-dock"><div class="panel-title"><span>Inspector</span></div><div class="right-panel" id="inspector"></div></aside>
 </main>
 <div id="toast" role="status" hidden></div>
 <dialog id="modal"><form method="dialog"><div id="modal-content"></div></form></dialog>

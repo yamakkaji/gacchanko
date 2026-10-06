@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             self?.emit("nativeDrop", value: ["paths": paths, "x": point.x, "y": point.y])
         }
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1440, height: 900), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        window.title = "がっちゃんこ gacchanko — connect intent to code"
+        window.title = "がっちゃんこ gacchanko"
         window.minSize = NSSize(width: 1050, height: 680)
         window.contentView = web
         window.delegate = self

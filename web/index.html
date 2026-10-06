@@ -23,7 +23,8 @@
 <section class="canvas-shell">
   <div class="canvas-top"><div><span class="eyebrow">DESIGN CANVAS</span></div><div class="canvas-badges"><span id="edge-count">0 connections</span><span id="ready-count">0 verified</span></div></div>
   <div id="canvas" tabindex="0" aria-label="ノードキャンバス">
-    <div id="world"><svg id="edges"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker></defs><g id="edge-paths"></g></svg><div id="nodes"></div></div>
+    <div id="world"><svg id="edges"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#a8a2d6"/></marker></defs><g id="edge-paths"></g></svg><div id="nodes"></div></div>
+    <div id="selection-box" hidden></div>
     <div id="empty-state"><div><button class="primary" id="empty-add">＋ フォルダを選ぶ</button><button id="load-example">サンプルを開く</button></div></div>
     <div id="connect-hint" hidden>接続先の入力ポートをクリック · Esc でキャンセル</div>
     <div class="canvas-controls"><button id="zoom-out" title="縮小">−</button><span id="zoom-label">100%</span><button id="zoom-in" title="拡大">＋</button><div></div><button id="fit-view" title="全体を表示">⌗</button><button id="undo" title="元に戻す">↶</button><button id="redo" title="やり直す">↷</button></div>

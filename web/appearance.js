@@ -15,13 +15,31 @@ window.gacchankoAppearance=(()=>{
   }
   function load(){try{return normalize(JSON.parse(localStorage.getItem(key)));}catch{return {...defaults};}}
   function save(value){const next=normalize(value);localStorage.setItem(key,JSON.stringify(next));return next;}
-  function geometry(a,b,{loopTop}={}){
-    const bend=Math.max(70,Math.abs(b.x-a.x)*.5);
-    const segments=Number.isFinite(loopTop)?[
-      [a,{x:a.x+64,y:a.y},{x:a.x+64,y:loopTop},{x:a.x+16,y:loopTop}],
-      [{x:a.x+16,y:loopTop},{x:a.x,y:loopTop},{x:b.x,y:loopTop},{x:b.x-16,y:loopTop}],
-      [{x:b.x-16,y:loopTop},{x:b.x-64,y:loopTop},{x:b.x-64,y:b.y},b]
-    ]:[[a,{x:a.x+bend,y:a.y},{x:b.x-bend,y:b.y},b]];
+  function geometry(a,b,{loopBottom}={}){
+    const dx=b.x-a.x,dy=b.y-a.y,distance=Math.hypot(dx,dy);
+    // A bell-shaped displacement to the right of the directed chord in screen
+    // coordinates: right/up, left/down, up/left, down/right.
+    const height=Math.max(40,Math.min(120,distance*.18));
+    const horizontal=Math.abs(dx)>=Math.abs(dy);
+    const middle=horizontal
+      ?{x:(a.x+b.x)/2,y:dx>=0?Math.min(a.y,b.y)-height:Math.max(a.y,b.y)+height}
+      :{x:dy<0?Math.min(a.x,b.x)-height:Math.max(a.x,b.x)+height,y:(a.y+b.y)/2};
+    const handle=Math.max(24,distance*.18);
+    const end=horizontal?{x:handle,y:0}:{x:0,y:Math.sign(dy)*handle};
+    const along=horizontal?{x:Math.sign(dx||1)*handle,y:0}:{x:0,y:Math.sign(dy)*handle};
+    let segments=[
+      [a,{x:a.x+end.x,y:a.y+end.y},{x:middle.x-along.x,y:middle.y-along.y},middle],
+      [middle,{x:middle.x+along.x,y:middle.y+along.y},{x:b.x-end.x,y:b.y-end.y},b]
+    ];
+    if(Number.isFinite(loopBottom)){
+      const right={x:a.x+36,y:loopBottom-36},left={x:b.x-36,y:loopBottom-36},bottom={x:(a.x+b.x)/2,y:loopBottom};
+      segments=[
+        [a,{x:a.x+64,y:a.y},{x:a.x+64,y:right.y-24},right],
+        [right,{x:a.x+8,y:loopBottom-12},{x:bottom.x+56,y:loopBottom},bottom],
+        [bottom,{x:bottom.x-56,y:loopBottom},{x:b.x-8,y:loopBottom-12},left],
+        [left,{x:b.x-64,y:left.y-24},{x:b.x-64,y:b.y},b]
+      ];
+    }
     function locate(t){const index=Math.min(segments.length-1,Math.floor(t*segments.length));return {points:segments[index],t:t*segments.length-index};}
     const point=value=>{const {points:[p,c,d,q],t}=locate(value),u=1-t;return{x:u*u*u*p.x+3*u*u*t*c.x+3*u*t*t*d.x+t*t*t*q.x,y:u*u*u*p.y+3*u*u*t*c.y+3*u*t*t*d.y+t*t*t*q.y};};
     const tangent=value=>{const {points:[p,c,d,q],t}=locate(value),u=1-t,n=segments.length;return{x:n*(3*u*u*(c.x-p.x)+6*u*t*(d.x-c.x)+3*t*t*(q.x-d.x)),y:n*(3*u*u*(c.y-p.y)+6*u*t*(d.y-c.y)+3*t*t*(q.y-d.y))};};
@@ -38,8 +56,8 @@ window.gacchankoAppearance=(()=>{
     return {point,tangent,samples,length,at,d,parts:segments.length};
   }
   function mix(a,b,t){return '#'+[1,3,5].map(i=>Math.round(parseInt(a.slice(i,i+2),16)*(1-t)+parseInt(b.slice(i,i+2),16)*t).toString(16).padStart(2,'0')).join('');}
-  function render(a,b,{settings,zoom=1,id='preview',statusColour='#a8a2d6',request=false,selected=false,loopTop}){
-    const s=normalize(settings),g=geometry(a,b,{loopTop}),gradient=['gradient','both'].includes(s.style),pattern=['pattern','both'].includes(s.style);
+  function render(a,b,{settings,zoom=1,id='preview',statusColour='#a8a2d6',request=false,selected=false,loopBottom}){
+    const s=normalize(settings),g=geometry(a,b,{loopBottom}),gradient=['gradient','both'].includes(s.style),pattern=['pattern','both'].includes(s.style);
     const d=g.d;
     const colour=s.style==='solid'?statusColour:s.source;
     let svg=selected?`<path class="edge-selection" d="${d}" stroke-width="${(s.width+6)/zoom}"/>`:'';

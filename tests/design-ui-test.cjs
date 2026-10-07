@@ -108,7 +108,7 @@ const settle=()=>new Promise(r=>setTimeout(r,10));
  input('#edge-layer-filter','control');api.createConnection('a','a','out','in');
  const loop=api.graph.edges.at(-1),group=$(`.edge-group[data-edge="${loop.id}"]`);
  check(group&&group.querySelector('.edge-hit').getAttribute('d')===group.querySelector('.edge-line').getAttribute('d'),'self-loop hit area follows visible loop');
- check(Number(group.querySelector('.edge-label-bg').getAttribute('y'))<api.graph.nodes[0].y,'self-loop label is above the node');
+ check(Number(group.querySelector('.edge-label-bg').getAttribute('y'))>api.graph.nodes[0].y+140,'self-loop label is below the node');
  check(w.document.querySelectorAll('.edge-endpoint').length===2,'selected self-loop retains both reconnection handles');
  input('#edge-layer-filter','event');api.createConnection('a','a','out','in');
  const secondLoop=api.graph.edges.at(-1);

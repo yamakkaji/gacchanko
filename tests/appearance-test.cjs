@@ -37,19 +37,33 @@ for(const [name,a,b]of [
   console.log(`PASS ${name} edge preserves endpoint colours, colour order and zoomed line width`);
 }
 for(const [sourceY,targetY] of [[99,99],[99,153],[180,99]]){
- const a={x:224,y:sourceY},b={x:0,y:targetY},route={loopTop:-52};
+ const a={x:224,y:sourceY},b={x:0,y:targetY},route={loopBottom:284};
  const g=api.geometry(a,b,route);
  assert.equal(JSON.stringify(g.point(0)),JSON.stringify(a));assert.equal(JSON.stringify(g.point(1)),JSON.stringify(b));
- assert(g.samples.every(p=>p.x<=0||p.x>=224||p.y<0),'self-loop stays outside node body');
+ assert(g.samples.every(p=>p.x<=0||p.x>=224||p.y>200),'self-loop stays outside node body');
  assert(g.tangent(0).x>0&&g.tangent(1).x>0,'self-loop leaves output and approaches input in correct directions');
  for(const zoom of [.25,1,2.5]){
   svg.innerHTML=api.render(a,b,{...route,settings:chosen,zoom,id:'self-loop',selected:true});
   assert.equal(svg.querySelector('.edge-line').getAttribute('d'),g.d);
   assert.equal(svg.querySelector('.edge-selection').getAttribute('d'),g.d);
-  assert(!/NaN|Infinity/.test(svg.innerHTML));assert.equal(svg.querySelectorAll('.edge-gradient-segment').length,48);
+  assert(!/NaN|Infinity/.test(svg.innerHTML));assert.equal(svg.querySelectorAll('.edge-gradient-segment').length,64);
   assert.equal(svg.querySelector('stop').getAttribute('stop-color'),chosen.source);
   assert.equal([...svg.querySelectorAll('stop')].at(-1).getAttribute('stop-color'),chosen.target);
  }
  console.log('PASS self-loop routes outside node for ports '+sourceY+' → '+targetY+' and all zoom levels');
+}
+for(const [a,b,axis,sign] of [
+ [{x:0,y:0},{x:500,y:0},'y',-1],
+ [{x:500,y:0},{x:0,y:0},'y',1],
+ [{x:0,y:500},{x:0,y:0},'x',-1],
+ [{x:0,y:0},{x:0,y:500},'x',1],
+ [{x:0,y:140},{x:500,y:0},'y',-1],
+ [{x:500,y:0},{x:0,y:140},'y',1]
+]){
+ const g=api.geometry(a,b),mid=g.point(.5),baseline=(a[axis]+b[axis])/2;
+ assert((mid[axis]-baseline)*sign>0,'bell bulges on the correct side of the chord');
+ assert.equal(JSON.stringify(g.point(0)),JSON.stringify(a));
+ assert.equal(JSON.stringify(g.point(1)),JSON.stringify(b));
+ console.log('PASS directional bell '+JSON.stringify(a)+' → '+JSON.stringify(b));
 }
 first.window.close();second.window.close();

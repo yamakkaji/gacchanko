@@ -114,7 +114,7 @@
   check(selectedIs(),'click on empty canvas clears selection');
   const arrow=document.querySelector('.edge-direction');
   const arrowTransform=arrow.getAttribute('transform');
-  check(arrowTransform.includes('rotate(0)')&&Math.abs(Number(arrowTransform.match(/scale\(([^)]+)\)/)[1])*transform()[2]-1)<1e-8,'out-to-in arrow points toward target and keeps screen size when zoomed out');
+  check(Math.cos(Number(arrowTransform.match(/rotate\(([^)]+)\)/)[1])*Math.PI/180)>0&&Math.abs(Number(arrowTransform.match(/scale\(([^)]+)\)/)[1])*transform()[2]-1)<1e-8,'out-to-in arrow points toward target and keeps screen size when zoomed out');
   const labelRect=document.querySelector('.edge-label-bg');
   check(Number(labelRect.getAttribute('y'))+26<178.5-5/transform()[2],'connection label clears the direction arrow on short horizontal edges');
   const targetNode=P.graph.nodes.find(n=>n.id==='target'),oldTargetX=targetNode.x;

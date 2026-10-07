@@ -36,4 +36,20 @@ for(const [name,a,b]of [
   assert.equal(svg.querySelector('.edge-gradient-segment').getAttribute('stroke-width'),'28');
   console.log(`PASS ${name} edge preserves endpoint colours, colour order and zoomed line width`);
 }
+for(const [sourceY,targetY] of [[99,99],[99,153],[180,99]]){
+ const a={x:224,y:sourceY},b={x:0,y:targetY},route={loopTop:-52};
+ const g=api.geometry(a,b,route);
+ assert.equal(JSON.stringify(g.point(0)),JSON.stringify(a));assert.equal(JSON.stringify(g.point(1)),JSON.stringify(b));
+ assert(g.samples.every(p=>p.x<=0||p.x>=224||p.y<0),'self-loop stays outside node body');
+ assert(g.tangent(0).x>0&&g.tangent(1).x>0,'self-loop leaves output and approaches input in correct directions');
+ for(const zoom of [.25,1,2.5]){
+  svg.innerHTML=api.render(a,b,{...route,settings:chosen,zoom,id:'self-loop',selected:true});
+  assert.equal(svg.querySelector('.edge-line').getAttribute('d'),g.d);
+  assert.equal(svg.querySelector('.edge-selection').getAttribute('d'),g.d);
+  assert(!/NaN|Infinity/.test(svg.innerHTML));assert.equal(svg.querySelectorAll('.edge-gradient-segment').length,48);
+  assert.equal(svg.querySelector('stop').getAttribute('stop-color'),chosen.source);
+  assert.equal([...svg.querySelectorAll('stop')].at(-1).getAttribute('stop-color'),chosen.target);
+ }
+ console.log('PASS self-loop routes outside node for ports '+sourceY+' → '+targetY+' and all zoom levels');
+}
 first.window.close();second.window.close();

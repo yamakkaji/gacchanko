@@ -15,32 +15,40 @@ window.gacchankoAppearance=(()=>{
   }
   function load(){try{return normalize(JSON.parse(localStorage.getItem(key)));}catch{return {...defaults};}}
   function save(value){const next=normalize(value);localStorage.setItem(key,JSON.stringify(next));return next;}
-  function geometry(a,b){
+  function geometry(a,b,{loopTop}={}){
     const bend=Math.max(70,Math.abs(b.x-a.x)*.5);
-    const point=t=>{const u=1-t;return{x:u*u*u*a.x+3*u*u*t*(a.x+bend)+3*u*t*t*(b.x-bend)+t*t*t*b.x,y:u*u*u*a.y+3*u*u*t*a.y+3*u*t*t*b.y+t*t*t*b.y};};
-    const tangent=t=>{const u=1-t;return{x:3*u*u*bend+6*u*t*(b.x-a.x-2*bend)+3*t*t*bend,y:6*u*t*(b.y-a.y)};};
+    const segments=Number.isFinite(loopTop)?[
+      [a,{x:a.x+64,y:a.y},{x:a.x+64,y:loopTop},{x:a.x+16,y:loopTop}],
+      [{x:a.x+16,y:loopTop},{x:a.x,y:loopTop},{x:b.x,y:loopTop},{x:b.x-16,y:loopTop}],
+      [{x:b.x-16,y:loopTop},{x:b.x-64,y:loopTop},{x:b.x-64,y:b.y},b]
+    ]:[[a,{x:a.x+bend,y:a.y},{x:b.x-bend,y:b.y},b]];
+    function locate(t){const index=Math.min(segments.length-1,Math.floor(t*segments.length));return {points:segments[index],t:t*segments.length-index};}
+    const point=value=>{const {points:[p,c,d,q],t}=locate(value),u=1-t;return{x:u*u*u*p.x+3*u*u*t*c.x+3*u*t*t*d.x+t*t*t*q.x,y:u*u*u*p.y+3*u*u*t*c.y+3*u*t*t*d.y+t*t*t*q.y};};
+    const tangent=value=>{const {points:[p,c,d,q],t}=locate(value),u=1-t,n=segments.length;return{x:n*(3*u*u*(c.x-p.x)+6*u*t*(d.x-c.x)+3*t*t*(q.x-d.x)),y:n*(3*u*u*(c.y-p.y)+6*u*t*(d.y-c.y)+3*t*t*(q.y-d.y))};};
+    const d=`M ${a.x} ${a.y} `+segments.map(([,p,q,r])=>`C ${p.x} ${p.y}, ${q.x} ${q.y}, ${r.x} ${r.y}`).join(' ');
+    const steps=64*segments.length;
     const samples=[];let length=0,previous=a;
-    for(let i=0;i<=64;i++){const p=point(i/64);length+=Math.hypot(p.x-previous.x,p.y-previous.y);samples.push({...p,t:i/64,length});previous=p;}
+    for(let i=0;i<=steps;i++){const p=point(i/steps);length+=Math.hypot(p.x-previous.x,p.y-previous.y);samples.push({...p,t:i/steps,length});previous=p;}
     function at(distance){
       distance=Math.max(0,Math.min(length,distance));
       const hi=Math.max(1,samples.findIndex(p=>p.length>=distance)),right=samples[hi],left=samples[hi-1];
       const t=left.t+(right.t-left.t)*(distance-left.length)/(right.length-left.length||1),d=tangent(t);
       return {...point(t),angle:Math.atan2(d.y,d.x)*180/Math.PI};
     }
-    return {point,tangent,samples,length,at};
+    return {point,tangent,samples,length,at,d,parts:segments.length};
   }
   function mix(a,b,t){return '#'+[1,3,5].map(i=>Math.round(parseInt(a.slice(i,i+2),16)*(1-t)+parseInt(b.slice(i,i+2),16)*t).toString(16).padStart(2,'0')).join('');}
-  function render(a,b,{settings,zoom=1,id='preview',statusColour='#a8a2d6',request=false,selected=false}){
-    const s=normalize(settings),g=geometry(a,b),gradient=['gradient','both'].includes(s.style),pattern=['pattern','both'].includes(s.style);
-    const bend=Math.max(70,Math.abs(b.x-a.x)*.5),d=`M ${a.x} ${a.y} C ${a.x+bend} ${a.y}, ${b.x-bend} ${b.y}, ${b.x} ${b.y}`;
+  function render(a,b,{settings,zoom=1,id='preview',statusColour='#a8a2d6',request=false,selected=false,loopTop}){
+    const s=normalize(settings),g=geometry(a,b,{loopTop}),gradient=['gradient','both'].includes(s.style),pattern=['pattern','both'].includes(s.style);
+    const d=g.d;
     const colour=s.style==='solid'?statusColour:s.source;
     let svg=selected?`<path class="edge-selection" d="${d}" stroke-width="${(s.width+6)/zoom}"/>`:'';
     svg+=`<path class="edge-line" d="${d}" style="stroke:${colour};stroke-width:${s.width/zoom};vector-effect:none"/>`;
     if(gradient&&g.length>0){
       // Each subcurve gets an arc-length colour range. Loops and reverse edges
       // therefore keep progressing from source colour to target colour.
-      for(let i=0;i<16;i++){
-        const t0=i/16,t1=(i+1)/16,p=g.point(t0),q=g.point(t1),dp=g.tangent(t0),dq=g.tangent(t1),dt=(t1-t0)/3;
+      for(let i=0;i<16*g.parts;i++){
+        const t0=i/(16*g.parts),t1=(i+1)/(16*g.parts),p=g.point(t0),q=g.point(t1),dp=g.tangent(t0+1e-10),dq=g.tangent(t1-1e-10),dt=(t1-t0)/3;
         const c0=mix(s.source,s.target,g.samples[i*4].length/g.length),c1=mix(s.source,s.target,g.samples[(i+1)*4].length/g.length),gid=`${id}-gradient-${i}`;
         svg+=`<defs><linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"><stop offset="0" stop-color="${c0}"/><stop offset="1" stop-color="${c1}"/></linearGradient></defs><path class="edge-gradient-segment" d="M ${p.x} ${p.y} C ${p.x+dp.x*dt} ${p.y+dp.y*dt}, ${q.x-dq.x*dt} ${q.y-dq.y*dt}, ${q.x} ${q.y}" stroke="url(#${gid})" stroke-width="${s.width/zoom}"/>`;
       }
@@ -62,5 +70,5 @@ window.gacchankoAppearance=(()=>{
     if(request){const p=g.at(12/zoom);svg+=`<path class="edge-return" d="M -8 -4 L 0 0 L -8 4" fill="none" stroke="${colour}" stroke-width="2" transform="translate(${p.x} ${p.y}) rotate(${p.angle+180}) scale(${1/zoom})"/>`;}
     return svg;
   }
-  return Object.freeze({defaults,normalize,load,save,render});
+  return Object.freeze({defaults,normalize,load,save,render,geometry});
 })();

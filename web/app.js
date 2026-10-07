@@ -77,7 +77,14 @@ function updateHeader(){
 function status(id){return reports[id]?.status||'pending';}
 function nodeHeight(n){return 86+Math.max(n.inputs.length,n.outputs.length,1)*27;}
 function portPoint(nodeID,port,direction){const n=graph.nodes.find(n=>n.id===nodeID);if(!n)return {x:0,y:0};const index=Math.max(0,(direction==='out'?n.outputs:n.inputs).indexOf(port));return{x:n.x+(direction==='out'?224:0),y:n.y+85+index*27+13.5};}
-function curve(a,b){const bend=Math.max(70,Math.abs(b.x-a.x)*.5);return `M ${a.x} ${a.y} C ${a.x+bend} ${a.y}, ${b.x-bend} ${b.y}, ${b.x} ${b.y}`;}
+function curve(a,b,route={}){return appearance.geometry(a,b,route).d;}
+function edgeRoute(source,target,id){
+  if(source!==target)return {};
+  const n=graph.nodes.find(n=>n.id===source);if(!n)return {};
+  const loops=graph.edges.filter(e=>e.source===source&&e.target===source);
+  const index=id?Math.max(0,loops.findIndex(e=>e.id===id)):loops.length;
+  return {loopTop:n.y-52-index*52};
+}
 // Selection is UI state only; the saved graph schema stays unchanged.
 function selectedNodeIDs(){return selected?.type==='node'?[selected.id]:selected?.type==='nodes'?selected.ids:[];}
 function setNodeSelection(ids){
@@ -99,9 +106,9 @@ function beginDrag(event,state){
 function renderEdges(){
   $('#edge-paths').innerHTML=graph.edges.filter(e=>edgeLayerFilter==='all'||(e.layer||'data')===edgeLayerFilter).map((e,index)=>{
     const a=portPoint(e.source,e.sourcePort,'out'),b=portPoint(e.target,e.targetPort,'in');
-    const x=(a.x+b.x)/2,y=(a.y+b.y)/2, label=((e.layer||'data')==='control'?'▶ ':e.layer==='event'?'ϟ ':'')+(e.execution?.dispatch==='async'?'⇢ ':'')+(design.locked(e)?(e.policy==='template'?'◇ ':'🔒 '):e.derivedFrom?'↳ ':'')+(e.mode==='request'?'↔ ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
+    const route=edgeRoute(e.source,e.target,e.id),x=(a.x+b.x)/2,y=route.loopTop??(a.y+b.y)/2, label=((e.layer||'data')==='control'?'▶ ':e.layer==='event'?'ϟ ':'')+(e.execution?.dispatch==='async'?'⇢ ':'')+(design.locked(e)?(e.policy==='template'?'◇ ':'🔒 '):e.derivedFrom?'↳ ':'')+(e.mode==='request'?'↔ ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
     const colour={verified:'#416762',implemented:'#715669',stale:'#9a6a23',blocked:'#a54844'}[status(e.id)]||'#486080';
-    return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-layer="${esc(e.layer||'data')}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${curve(a,b)}"/>${appearance.render(a,b,{settings:edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
+    return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-layer="${esc(e.layer||'data')}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${curve(a,b,route)}"/>${appearance.render(a,b,{...route,settings:edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
   }).join('')+connectionPreview();
   $$('.edge-group').forEach(el=>{
     el.classList.toggle('reconnecting',connecting?.edgeID===el.dataset.edge);
@@ -150,7 +157,7 @@ function transform(){
   renderEdges();
 }
 function canvasPoint(clientX,clientY){const r=$('#canvas').getBoundingClientRect();return{x:(clientX-r.left-view.x)/view.zoom,y:(clientY-r.top-view.y)/view.zoom};}
-function fit(){if(!graph.nodes.length){view={x:65,y:65,zoom:1};transform();return;}const r=$('#canvas').getBoundingClientRect();const minX=Math.min(...graph.nodes.map(n=>n.x)),minY=Math.min(...graph.nodes.map(n=>n.y)),maxX=Math.max(...graph.nodes.map(n=>n.x+224)),maxY=Math.max(...graph.nodes.map(n=>n.y+nodeHeight(n)));
+function fit(){if(!graph.nodes.length){view={x:65,y:65,zoom:1};transform();return;}const r=$('#canvas').getBoundingClientRect();const loopNodes=graph.nodes.filter(n=>graph.edges.some(e=>e.source===n.id&&e.target===n.id));const loopTops=graph.edges.filter(e=>e.source===e.target).map(e=>edgeRoute(e.source,e.target,e.id).loopTop-40);const minX=Math.min(...graph.nodes.map(n=>n.x),...loopNodes.map(n=>n.x-64)),minY=Math.min(...graph.nodes.map(n=>n.y),...loopTops),maxX=Math.max(...graph.nodes.map(n=>n.x+224),...loopNodes.map(n=>n.x+288)),maxY=Math.max(...graph.nodes.map(n=>n.y+nodeHeight(n)));
   const zoom=Math.min(1.1,Math.max(.25,Math.min((r.width-100)/(maxX-minX),(r.height-130)/(maxY-minY))));view={zoom,x:(r.width-(maxX-minX)*zoom)/2-minX*zoom,y:(r.height-(maxY-minY)*zoom)/2-minY*zoom-12};transform();}
 function zoomBy(factor,cx,cy){const r=$('#canvas').getBoundingClientRect();const x=cx??r.left+r.width/2,y=cy??r.top+r.height/2;const p=canvasPoint(x,y);view.zoom=Math.max(.2,Math.min(2.5,view.zoom*factor));view.x=x-r.left-p.x*view.zoom;view.y=y-r.top-p.y*view.zoom;transform();}
 function movingDirection(){return connecting?.moving==='source'?'out':'in';}
@@ -227,7 +234,8 @@ function completeConnection(candidate){
 function connectionPreview(){
   if(!connecting)return '';
   const c=connecting,p=portPoint(c.fixed.node,c.fixed.port,c.fixed.direction),a=c.moving==='source'?c.point:p,b=c.moving==='target'?c.point:p;
-  return `<g class="connection-preview ${c.candidate?'snapped':''}"><path class="edge-line" d="${curve(a,b)}" ${c.candidate?'':'stroke-dasharray="5 4"'}/>${c.candidate?`<circle class="snap-ring" cx="${c.point.x}" cy="${c.point.y}" r="${11/view.zoom}" vector-effect="non-scaling-stroke"/>`:''}</g>`;
+  const route=c.candidate?edgeRoute(c.fixed.node,c.candidate.node,c.edgeID):{};
+  return `<g class="connection-preview ${c.candidate?'snapped':''}"><path class="edge-line" d="${curve(a,b,route)}" ${c.candidate?'':'stroke-dasharray="5 4"'}/>${c.candidate?`<circle class="snap-ring" cx="${c.point.x}" cy="${c.point.y}" r="${11/view.zoom}" vector-effect="non-scaling-stroke"/>`:''}</g>`;
 }
 function renderConnectionHandles(){
   const edge=selected?.type==='edge'?graph.edges.find(e=>e.id===selected.id):null;

@@ -105,6 +105,16 @@ const settle=()=>new Promise(r=>setTimeout(r,10));
  check(api.graph.edges.length===3,'same ports support independent edges on different layers');
  input('#edge-layer-filter','all');api.createConnection('b','a','out','in');
  check(api.graph.edges.at(-1).layer==='data','all-layer view defaults new edges to data');
+ input('#edge-layer-filter','control');api.createConnection('a','a','out','in');
+ const loop=api.graph.edges.at(-1),group=$(`.edge-group[data-edge="${loop.id}"]`);
+ check(group&&group.querySelector('.edge-hit').getAttribute('d')===group.querySelector('.edge-line').getAttribute('d'),'self-loop hit area follows visible loop');
+ check(Number(group.querySelector('.edge-label-bg').getAttribute('y'))<api.graph.nodes[0].y,'self-loop label is above the node');
+ check(w.document.querySelectorAll('.edge-endpoint').length===2,'selected self-loop retains both reconnection handles');
+ input('#edge-layer-filter','event');api.createConnection('a','a','out','in');
+ const secondLoop=api.graph.edges.at(-1);
+ input('#edge-layer-filter','all');
+ check($(`.edge-group[data-edge="${loop.id}"] .edge-line`).getAttribute('d')!==$(`.edge-group[data-edge="${secondLoop.id}"] .edge-line`).getAttribute('d'),'multiple self-loops use separate lanes');
+ api.undo();api.redo();api.fit();check($('.edge-group[data-edge="'+secondLoop.id+'"]'),'self-loop survives undo, redo and fit');
  console.log(count+' design/UI checks passed');
  }finally{dom.window.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

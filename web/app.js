@@ -129,7 +129,7 @@ function renderNodes(){
       if(connecting)clearConnection();
       // A singly-wired input can be picked up directly. For shared ports the
       // selected edge's endpoint handles identify exactly which wire to move.
-      const incoming=graph.edges.filter(edge=>edge.target===candidate.node&&edge.targetPort===candidate.port);
+      const incoming=graph.edges.filter(edge=>(edgeLayerFilter==='all'||(edge.layer||'data')===edgeLayerFilter)&&edge.target===candidate.node&&edge.targetPort===candidate.port);
       if(candidate.direction==='in'&&incoming.length===1)beginConnection(e,'target',incoming[0]);
       else if(candidate.direction==='in'&&incoming.length>1)toast('付け替える線を選び、その接点をドラッグしてください。');
       else beginConnection(e,candidate.direction==='out'?'target':'source',null,candidate);
@@ -165,7 +165,8 @@ function validCandidate(candidate){
   const next=connectionEndpoints(candidate);
   const old=graph.edges.find(e=>e.id===connecting.edgeID);
   if(old&&(design.locked(old)||graph.nodes.some(n=>[old.source,old.target].includes(n.id)&&design.locked(n)))&&Object.keys(next).some(k=>next[k]!==old[k]))return false;
-  return !graph.edges.some(e=>e.id!==connecting.edgeID&&e.source===next.source&&e.target===next.target&&e.sourcePort===next.sourcePort&&e.targetPort===next.targetPort);
+  const layer=old?.layer|| (old?'data':edgeLayerFilter==='all'?'data':edgeLayerFilter);
+  return !graph.edges.some(e=>(e.layer||'data')===layer&&e.id!==connecting.edgeID&&e.source===next.source&&e.target===next.target&&e.sourcePort===next.sourcePort&&e.targetPort===next.targetPort);
 }
 function nearestPort(clientX,clientY){
   if(!connecting)return null;
@@ -185,7 +186,7 @@ function updatePortStates(){
   $$('.node .port').forEach(el=>{
     const node=el.closest('.node').dataset.node,direction=el.dataset.direction,port=el.dataset.port,c=connecting?.candidate;
     el.classList.toggle('snap-target',!!c&&c.node===node&&c.direction===direction&&c.port===port);
-    el.classList.toggle('connected',graph.edges.some(e=>direction==='out'?e.source===node&&e.sourcePort===port:e.target===node&&e.targetPort===port));
+    el.classList.toggle('connected',graph.edges.some(e=>(edgeLayerFilter==='all'||(e.layer||'data')===edgeLayerFilter)&&(direction==='out'?e.source===node&&e.sourcePort===port:e.target===node&&e.targetPort===port)));
   });
 }
 function beginConnection(event,moving,edge=null,port=null){
@@ -239,9 +240,10 @@ function renderConnectionHandles(){
   }));
 }
 function createConnection(source,target,sourcePort,targetPort){
+  const layer=edgeLayerFilter==='all'?'data':edgeLayerFilter;
   clearConnection(false);
-  if(graph.edges.some(e=>e.source===source&&e.target===target&&e.sourcePort===sourcePort&&e.targetPort===targetPort)){toast('このポート間の接続はすでにあります。');renderEdges();return;}
-  const edge={id:uid('edge'),source,target,sourcePort,targetPort,label:'新しい接続',intent:'',mode:'data',policy:'mutable',designInstructions:''};
+  if(graph.edges.some(e=>(e.layer||'data')===layer&&e.source===source&&e.target===target&&e.sourcePort===sourcePort&&e.targetPort===targetPort)){toast('このレイヤーのポート間には接続がすでにあります。');renderEdges();return;}
+  const edge={id:uid('edge'),source,target,sourcePort,targetPort,layer,label:'新しい接続',intent:'',mode:'data',policy:'mutable',designInstructions:''};
   mutate(()=>{graph.edges.push(edge);selected={type:'edge',id:edge.id};});
   connectionDraftID=edge.id;renderInspector(true);setTimeout(()=>$('#edge-intent')?.focus(),30);
 }

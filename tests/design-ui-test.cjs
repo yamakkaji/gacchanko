@@ -95,6 +95,16 @@ const settle=()=>new Promise(r=>setTimeout(r,10));
  check(api.graph.nodes[0].description==='Agent design'&&$('#external-banner').hidden,'selected proposal applied through native bridge');
  const removed=D.changes(copy(stored),{...copy(stored),nodes:stored.nodes.slice(1)});
  check(removed.some(c=>c.kind==='node'&&c.change==='removed'&&c.before),'deleted nodes retain their before state in diff');
+ api.cleanState({project:{schemaVersion:1,name:'Layers',description:'Layer regression',nodes:[n('a',0),n('b',350)],edges:[]},root:'',revision:'',reports:{}});
+ for(const layer of ['control','event','data']){
+   input('#edge-layer-filter',layer);api.createConnection('a','b','out','in');
+   check(api.graph.edges.at(-1).layer===layer&&$('.edge-group')&&$('#edge-layer').value===layer,'new '+layer+' edge belongs to active layer and remains visible');
+   const before=api.graph.edges.length;api.createConnection('a','b','out','in');
+   check(api.graph.edges.length===before,'duplicate in '+layer+' layer rejected');
+ }
+ check(api.graph.edges.length===3,'same ports support independent edges on different layers');
+ input('#edge-layer-filter','all');api.createConnection('b','a','out','in');
+ check(api.graph.edges.at(-1).layer==='data','all-layer view defaults new edges to data');
  console.log(count+' design/UI checks passed');
  }finally{dom.window.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

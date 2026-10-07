@@ -3,11 +3,18 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
-  <title>がっちゃんこ gacchanko</title><link rel="stylesheet" href="style.css">
+  <title>がっちゃんこ gacchanko</title><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="workspace.css">
 </head>
 <body>
+<nav class="app-menubar" aria-label="アプリケーションメニュー">
+  <span class="app-mark" aria-hidden="true">◇</span>
+  <details class="app-menu"><summary>ファイル</summary><div><button data-action="new-project">新規プロジェクト</button><button data-action="open-project">開く <kbd>⌘O</kbd></button><button data-action="save-project">保存 <kbd>⌘S</kbd></button><button data-action="reveal-project">Finderで開く</button></div></details>
+  <details class="app-menu"><summary>編集</summary><div><button data-action="undo">元に戻す <kbd>⌘Z</kbd></button><button data-action="redo">やり直す <kbd>⇧⌘Z</kbd></button><button data-action="add-node">コンポーネントを追加</button></div></details>
+  <details class="app-menu"><summary>表示</summary><div><button data-action="fit-view">全体を表示</button><button data-action="show-history">変更履歴</button><button data-action="template-library">原型 / variants</button><button data-action="appearance-settings">設定</button></div></details>
+  <button class="menu-help" data-action="show-help">ヘルプ</button>
+  <span class="menubar-version">gacchanko <span>0.1</span></span>
+</nav>
 <header>
-  <div class="brand"><img class="brand-logo" src="gacchanko-logo.svg" alt="がっちゃんこ gacchanko" draggable="false"><span class="version">0.1</span></div>
   <div class="project-title"><span class="project-dot"></span><span id="project-title">Untitled project</span><span id="save-state">未保存</span></div>
   <div class="toolbar"><button id="open-project">開く <kbd>⌘O</kbd></button><button id="save-project">保存 <kbd>⌘S</kbd></button><button class="primary" id="handoff">↗ エージェントに渡す</button></div>
 </header>
@@ -19,9 +26,10 @@
   <div id="node-list"></div>
   <button id="add-node" class="add-component">＋ コンポーネントを追加</button>
   <div class="left-bottom"><button id="template-library">原型 / variants <span>◇</span></button><button id="show-history">変更履歴 <span>◷</span></button><button id="appearance-settings">設定 <span>⚙</span></button><button id="show-help">ヘルプ <span>↗</span></button><button id="reveal-project">プロジェクトを Finder で開く</button></div>
+  <div class="brand"><img class="brand-logo" src="gacchanko-logo.svg" alt="がっちゃんこ gacchanko" draggable="false"></div>
 </aside>
 <section class="canvas-shell">
-  <div class="canvas-top"><div class="canvas-caption"><span class="window-square" aria-hidden="true"></span><span class="window-title" id="canvas-project-title">Untitled project</span></div><div class="canvas-badges"><span id="edge-count">0 connections</span><span id="ready-count">0 verified</span></div></div>
+  <div class="canvas-top"><div class="canvas-caption"><span class="canvas-mode-dot" aria-hidden="true"></span><span class="window-title" id="canvas-project-title">Untitled project</span></div><div class="canvas-badges"><span id="edge-count">0 connections</span><span id="ready-count">0 verified</span></div></div>
   <div id="canvas" tabindex="0" aria-label="ノードキャンバス">
     <div id="world"><svg id="edges"><g id="edge-paths"></g></svg><div id="nodes"></div><svg id="edge-handles"></svg></div>
     <div id="selection-box" hidden></div>

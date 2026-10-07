@@ -530,3 +530,12 @@ $('#reject-external').onclick=safe(async()=>{
   const state=await call('rejectExternal',{diskRevision:pendingExternal.diskRevision});cleanState(state);
   if(draft){graph=draft;markDirty();render();}
 });
+
+// Compact desktop menus route to the existing actions and their validation.
+$$('.app-menubar [data-action]').forEach(button=>button.onclick=()=>{
+  $$('.app-menu').forEach(menu=>menu.open=false);
+  const target=$('#'+button.dataset.action);if(target&&!target.disabled)target.click();
+});
+$$('.app-menu').forEach(menu=>menu.addEventListener('toggle',()=>{if(menu.open)$$('.app-menu').filter(other=>other!==menu).forEach(other=>other.open=false);}));
+document.addEventListener('pointerdown',event=>{if(!event.target.closest('.app-menu'))$$('.app-menu').forEach(menu=>menu.open=false);});
+window.addEventListener('keydown',event=>{if(event.key==='Escape')$$('.app-menu').forEach(menu=>menu.open=false);});

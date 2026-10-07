@@ -12,11 +12,12 @@ window.gacchankoNodeAppearance=(()=>{
   const luminance=color=>rgb(color).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
   const contrast=(a,b)=>(Math.max(luminance(a),luminance(b))+.05)/(Math.min(luminance(a),luminance(b))+.05);
   function tokens(raw,kind){
-    const a=normalize(raw,kind),container=mix(a.color,'#ffffff',.84),body=a.surface==='filled'?mix(a.color,'#ffffff',.94):'#ffffff';
-    let ink=a.color;for(let i=0;i<20&&contrast(ink,container)<4.5;i++)ink=mix(ink,'#000000',.15);
+    const a=normalize(raw,kind),container=a.color,body=a.surface==='outlined'?'#ffffff':a.color;
+    const readable=background=>contrast('#ffffff',background)>contrast('#000000',background)?'#ffffff':'#000000';
+    const ink=readable(container),bodyInk=readable(body);
     const r=a.radius,small=a.corners==='alternating'?Math.min(4,r):r;
-    return {accent:ink,container,body,onContainer:contrast('#191c1e',container)>=4.5?'#191c1e':'#000000',outline:mix(a.color,'#ffffff',.35),radii:[r,small,r,small]};
+    return {accent:ink,container,body,onContainer:ink,bodyInk,outline:mix(a.color,'#ffffff',.35),radii:[r,small,r,small]};
   }
-  function style(raw,kind){const t=tokens(raw,kind);return `--accent:${t.accent};--node-container:${t.container};--node-body:${t.body};--node-on-container:${t.onContainer};--node-outline:${t.outline};--node-tl:${t.radii[0]}px;--node-tr:${t.radii[1]}px;--node-br:${t.radii[2]}px;--node-bl:${t.radii[3]}px;`;}
+  function style(raw,kind){const t=tokens(raw,kind);return `--accent:${t.accent};--node-container:${t.container};--node-body:${t.body};--node-body-ink:${t.bodyInk};--node-on-container:${t.onContainer};--node-outline:${t.outline};--node-tl:${t.radii[0]}px;--node-tr:${t.radii[1]}px;--node-br:${t.radii[2]}px;--node-bl:${t.radii[3]}px;`;}
   return Object.freeze({presets,normalize,tokens,style,contrast});
 })();

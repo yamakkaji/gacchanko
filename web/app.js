@@ -41,7 +41,7 @@ function cleanState(state,{replace=true}={}) {
   if(replace){clearConnection(false);graph=state.project;selected=null;undoStack=[];redoStack=[];}
   root=state.root;revision=state.revision;reports=state.reports||{};fingerprints=state.fingerprints||{};dirty=false;external=false;
   savedGraph=clone(state.project);historyState=state.history||{};changeOverlay=null;overlayFiles=null;pendingExternal=state.pendingExternal||null;external=!!pendingExternal;updateExternalBanner(); call('dirty',{value:false}).catch(()=>{});
-  try {localStorage.removeItem('gacchanko-draft');localStorage.removeItem('patchwork-draft');}catch{}
+  try {localStorage.removeItem('gacchanko-draft');}catch{}
   render(true);
 }
 async function save(interactive=true) {
@@ -57,7 +57,7 @@ async function save(interactive=true) {
     const state=await saveTask;
     if(!state)return false;
     root=state.root;revision=state.revision;reports=state.reports||{};fingerprints=state.fingerprints||{};
-    if(serial===editSerial){dirty=false;call('dirty',{value:false}).catch(()=>{});try{localStorage.removeItem('gacchanko-draft');localStorage.removeItem('patchwork-draft');}catch{}}
+    if(serial===editSerial){dirty=false;call('dirty',{value:false}).catch(()=>{});try{localStorage.removeItem('gacchanko-draft');}catch{}}
     else {dirty=true;call('dirty',{value:true}).catch(()=>{});saveTimer=setTimeout(()=>save(false).catch(e=>toast(e.message,true)),100);}
     savedGraph=clone(outgoing);historyState=state.history||{};changeOverlay=null;overlayFiles=null;applyChangeOverlay();updateHeader();if(wasNew)renderInspector(true);return true;
   } catch(e){$('#save-state').textContent='保存できません';throw e;}
@@ -342,7 +342,281 @@ function addDialog(){modal(`<h2>コンポーネントを追加</h2><button type=
   $('#dialog-url').onclick=()=>{modal(`<h2>参照先を追加</h2>${field('絶対パス、またはリポジトリ URL','path-entry','')}<div class="modal-actions"><button>キャンセル</button><button type="button" class="primary" id="add-reference">追加</button></div>`);$('#path-entry').focus();$('#add-reference').onclick=safe(async()=>{const value=$('#path-entry').value.trim();if(!value)return;const info=await call('inspect',{path:value});$('#modal').close();mutate(()=>{const{files,...fields}=info;const n=makeNode(fields);graph.nodes.push(n);selected={type:'node',id:n.id};});});};
 }
 async function handoff(edgeID){document.activeElement?.blur();if(!await save(true))return;const prompt=await call('copyPrompt',{edgeID});modal(`<h2>依頼文をコピーしました</h2><pre>${esc(prompt)}</pre><div class="modal-actions"><button>閉じる</button><button type="button" id="copy-again" class="primary">もう一度コピー</button></div>`);$('#copy-again').onclick=safe(async()=>{await call('copy',{text:prompt});toast('依頼文をコピーしました。');});}
-function exampleGraph(){return {"schemaVersion":1,"name":"Multimodal LLM agent","description":"画像・音声・テキストを入力できるシンプルなLLMエージェントの設計例。画像理解と文字起こしを経てLLMへ渡し、必要に応じてツールを呼び出して応答する。参照先・モデル・実装は未設定。","nodes":[{"id":"image","name":"画像入力","kind":"note","x":0,"y":0,"path":"","command":"","description":"ユーザーが選んだ画像をMIMEタイプとともに渡す。","inputs":[],"outputs":["image"],"policy":"mutable","appearance":{"color":"#4a6282","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"audio","name":"音声入力","kind":"note","x":0,"y":200,"path":"","command":"","description":"録音または音声ファイルをサンプルレートとともに渡す。","inputs":[],"outputs":["audio"],"policy":"mutable","appearance":{"color":"#715669","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"text","name":"テキスト入力","kind":"note","x":0,"y":400,"path":"","command":"","description":"ユーザーの質問や指示を文字列として渡す。","inputs":[],"outputs":["text"],"policy":"mutable","appearance":{"color":"#416762","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"vision","name":"画像理解","kind":"model","x":300,"y":0,"path":"","command":"","description":"画像を解釈し、内容とユーザーの質問に関連する情報をテキストにする。","inputs":["image"],"outputs":["description"],"policy":"mutable","appearance":{"color":"#4a6282","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"transcribe","name":"文字起こし","kind":"model","x":300,"y":200,"path":"","command":"","description":"音声認識で文字起こしする。認識できない場合はエラーを返す。","inputs":["audio"],"outputs":["transcript"],"policy":"mutable","appearance":{"color":"#715669","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"agent","name":"LLMエージェント","kind":"model","x":620,"y":160,"path":"","command":"","description":"同じリクエストの画像説明・文字起こし・テキストをまとめて推論する。各入力は任意。必要に応じてツールを呼び、結果を踏まえて最終応答を返す。","inputs":["image_context","audio_text","text"],"outputs":["tool_call","response"],"policy":"mutable","appearance":{"color":"#416762","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"tools","name":"ツール実行","kind":"service","x":940,"y":0,"path":"","command":"","description":"許可された検索・計算などのツールを実行する。引数を検証し結果またはエラーを返す。","inputs":["request"],"outputs":["result"],"policy":"mutable","appearance":{"color":"#80602d","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"response","name":"応答表示","kind":"application","x":940,"y":340,"path":"","command":"","description":"最終テキストをユーザーに表示する。","inputs":["text"],"outputs":[],"policy":"mutable","appearance":{"color":"#4a6282","radius":8,"corners":"uniform","surface":"filled","header":"plain"}}],"edges":[{"id":"edge_01","source":"image","target":"vision","sourcePort":"image","targetPort":"image","label":"画像","intent":"画像データとMIMEタイプを渡す。サイズと形式を検証する。","mode":"data","policy":"mutable"},{"id":"edge_02","source":"audio","target":"transcribe","sourcePort":"audio","targetPort":"audio","label":"音声","intent":"音声データとサンプルレートを渡す。形式を検証する。","mode":"data","policy":"mutable"},{"id":"edge_03","source":"vision","target":"agent","sourcePort":"description","targetPort":"image_context","label":"画像の説明","intent":"画像の説明をrequest_idとともに渡す。","mode":"data","policy":"mutable"},{"id":"edge_04","source":"transcribe","target":"agent","sourcePort":"transcript","targetPort":"audio_text","label":"文字起こし","intent":"認識したテキストをrequest_idとともに渡す。","mode":"data","policy":"mutable"},{"id":"edge_05","source":"text","target":"agent","sourcePort":"text","targetPort":"text","label":"ユーザーの指示","intent":"入力テキストをrequest_idとともに渡す。入力されていないモダリティは待たない。","mode":"data","policy":"mutable"},{"id":"edge_06","source":"agent","target":"tools","sourcePort":"tool_call","targetPort":"request","label":"ツール呼び出し","intent":"ツール名・引数・call_idを送り、同じ呼び出しの結果またはエラーを応答として受け取る。タイムアウトと最大呼び出し回数を設ける。","mode":"request","policy":"mutable"},{"id":"edge_07","source":"agent","target":"response","sourcePort":"response","targetPort":"text","label":"最終応答","intent":"最終テキストを渡して表示する。失敗時にはエラーを表示する。","mode":"data","policy":"mutable"}]};}
+function exampleGraph(){
+  return {
+  "schemaVersion": 1,
+  "name": "Multimodal LLM agent",
+  "description": "画像・音声・テキストを入力できるシンプルなLLMエージェントの設計例。画像理解と文字起こしを経てLLMへ渡し、必要に応じてツールを呼び出して応答する。参照先・モデル・実装は未設定。",
+  "nodes": [
+    {
+      "id": "image",
+      "name": "画像入力",
+      "kind": "note",
+      "x": 0,
+      "y": 0,
+      "path": "",
+      "command": "",
+      "description": "ユーザーが選んだ画像をMIMEタイプとともに渡す。",
+      "inputs": [],
+      "outputs": [
+        "image"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#4a6282",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "audio",
+      "name": "音声入力",
+      "kind": "note",
+      "x": 0,
+      "y": 200,
+      "path": "",
+      "command": "",
+      "description": "録音または音声ファイルをサンプルレートとともに渡す。",
+      "inputs": [],
+      "outputs": [
+        "audio"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#715669",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "text",
+      "name": "テキスト入力",
+      "kind": "note",
+      "x": 0,
+      "y": 400,
+      "path": "",
+      "command": "",
+      "description": "ユーザーの質問や指示を文字列として渡す。",
+      "inputs": [],
+      "outputs": [
+        "text"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#416762",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "vision",
+      "name": "画像理解",
+      "kind": "model",
+      "x": 300,
+      "y": 0,
+      "path": "",
+      "command": "",
+      "description": "画像を解釈し、内容とユーザーの質問に関連する情報をテキストにする。",
+      "inputs": [
+        "image"
+      ],
+      "outputs": [
+        "description"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#4a6282",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "transcribe",
+      "name": "文字起こし",
+      "kind": "model",
+      "x": 300,
+      "y": 200,
+      "path": "",
+      "command": "",
+      "description": "音声認識で文字起こしする。認識できない場合はエラーを返す。",
+      "inputs": [
+        "audio"
+      ],
+      "outputs": [
+        "transcript"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#715669",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "agent",
+      "name": "LLMエージェント",
+      "kind": "model",
+      "x": 620,
+      "y": 160,
+      "path": "",
+      "command": "",
+      "description": "同じリクエストの画像説明・文字起こし・テキストをまとめて推論する。各入力は任意。必要に応じてツールを呼び、結果を踏まえて最終応答を返す。",
+      "inputs": [
+        "image_context",
+        "audio_text",
+        "text"
+      ],
+      "outputs": [
+        "tool_call",
+        "response"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#416762",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "tools",
+      "name": "ツール実行",
+      "kind": "service",
+      "x": 940,
+      "y": 0,
+      "path": "",
+      "command": "",
+      "description": "許可された検索・計算などのツールを実行する。引数を検証し結果またはエラーを返す。",
+      "inputs": [
+        "request"
+      ],
+      "outputs": [
+        "result"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#80602d",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "response",
+      "name": "応答表示",
+      "kind": "application",
+      "x": 940,
+      "y": 340,
+      "path": "",
+      "command": "",
+      "description": "最終テキストをユーザーに表示する。",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#4a6282",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_01",
+      "source": "image",
+      "target": "vision",
+      "sourcePort": "image",
+      "targetPort": "image",
+      "label": "画像",
+      "intent": "画像データとMIMEタイプを渡す。サイズと形式を検証する。",
+      "mode": "data",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_02",
+      "source": "audio",
+      "target": "transcribe",
+      "sourcePort": "audio",
+      "targetPort": "audio",
+      "label": "音声",
+      "intent": "音声データとサンプルレートを渡す。形式を検証する。",
+      "mode": "data",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_03",
+      "source": "vision",
+      "target": "agent",
+      "sourcePort": "description",
+      "targetPort": "image_context",
+      "label": "画像の説明",
+      "intent": "画像の説明をrequest_idとともに渡す。",
+      "mode": "data",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_04",
+      "source": "transcribe",
+      "target": "agent",
+      "sourcePort": "transcript",
+      "targetPort": "audio_text",
+      "label": "文字起こし",
+      "intent": "認識したテキストをrequest_idとともに渡す。",
+      "mode": "data",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_05",
+      "source": "text",
+      "target": "agent",
+      "sourcePort": "text",
+      "targetPort": "text",
+      "label": "ユーザーの指示",
+      "intent": "入力テキストをrequest_idとともに渡す。入力されていないモダリティは待たない。",
+      "mode": "data",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_06",
+      "source": "agent",
+      "target": "tools",
+      "sourcePort": "tool_call",
+      "targetPort": "request",
+      "label": "ツール呼び出し",
+      "intent": "ツール名・引数・call_idを送り、同じ呼び出しの結果またはエラーを応答として受け取る。タイムアウトと最大呼び出し回数を設ける。",
+      "mode": "request",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_07",
+      "source": "agent",
+      "target": "response",
+      "sourcePort": "response",
+      "targetPort": "text",
+      "label": "最終応答",
+      "intent": "最終テキストを渡して表示する。失敗時にはエラーを表示する。",
+      "mode": "data",
+      "policy": "mutable"
+    }
+  ]
+};
+}
 
 async function replaceDraft(next){if(dirty&&!root&&!await confirmChoice('現在の未保存のグラフを置き換えます。'))return;if(root&&dirty){if(!await save(true))return;}clearConnection(false);historyState={};savedGraph=null;pendingExternal=null;changeOverlay=null;overlayFiles=null;root='';revision='';reports={};fingerprints={};selected=null;external=false;$('#external-banner').hidden=true;undoStack=[];redoStack=[];graph=next;markDirty();render();fit();}
 async function poll(){if(!root||saveTask)return;try{const state=await call('poll');if(state.externalChange){external=true;pendingExternal=state;updateExternalBanner();clearTimeout(saveTimer);if(!state.violations?.length&&!dirty&&!drag&&!connecting&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'')){
@@ -439,7 +713,7 @@ window.addEventListener('keydown',e=>{
   if(!typing&&!$('#modal').open&&!drag&&!connecting){if(e.metaKey&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}if(['Backspace','Delete'].includes(e.key)){e.preventDefault();safe(deleteSelected)();}if(e.key.toLowerCase()==='f')fit();}
 });
 window.gacchanko={call,get graph(){return graph;},get root(){return root;},get reports(){return reports;},makeNode,mutate,createConnection,select,save,poll,cleanState,fit,render,exampleGraph,addPaths,undo,redo,status,replaceDraft};
-async function init(){render();if(native){const state=await call('state');if(state.project){cleanState(state);fit();}else{try{const backup=JSON.parse(localStorage.getItem('gacchanko-draft')||localStorage.getItem('patchwork-draft')||'null');if(backup?.graph&&await confirmChoice('前回の未保存の編集を復元しますか？')){graph=backup.graph;root='';revision='';markDirty();render();fit();}}catch(e){toast(e.message,true);}}}setInterval(poll,2000);}
+async function init(){render();if(native){const state=await call('state');if(state.project){cleanState(state);fit();}else{try{const backup=JSON.parse(localStorage.getItem('gacchanko-draft')||'null');if(backup?.graph&&await confirmChoice('前回の未保存の編集を復元しますか？')){graph=backup.graph;root='';revision='';markDirty();render();fit();}}catch(e){toast(e.message,true);}}}setInterval(poll,2000);}
 window.gacchankoReady=init().catch(e=>toast(e.message,true));
 
 function updateExternalBanner(){

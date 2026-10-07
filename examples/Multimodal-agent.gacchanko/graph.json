@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "name": "Multimodal LLM agent",
+  "description": "画像・音声・テキストを入力できるシンプルなLLMエージェントの設計例。画像理解と文字起こしを経てLLMへ渡し、必要に応じてツールを呼び出して応答する。参照先・モデル・実装は未設定。",
+  "nodes": [
+    {
+      "id": "image",
+      "name": "画像入力",
+      "kind": "note",
+      "x": 0,
+      "y": 0,
+      "path": "",
+      "command": "",
+      "description": "ユーザーが選んだ画像をMIMEタイプとともに渡す。",
+      "inputs": [],
+      "outputs": [
+        "image"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#4a6282",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "audio",
+      "name": "音声入力",
+      "kind": "note",
+      "x": 0,
+      "y": 200,
+      "path": "",
+      "command": "",
+      "description": "録音または音声ファイルをサンプルレートとともに渡す。",
+      "inputs": [],
+      "outputs": [
+        "audio"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#715669",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "text",
+      "name": "テキスト入力",
+      "kind": "note",
+      "x": 0,
+      "y": 400,
+      "path": "",
+      "command": "",
+      "description": "ユーザーの質問や指示を文字列として渡す。",
+      "inputs": [],
+      "outputs": [
+        "text"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#416762",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "vision",
+      "name": "画像理解",
+      "kind": "model",
+      "x": 300,
+      "y": 0,
+      "path": "",
+      "command": "",
+      "description": "画像を解釈し、内容とユーザーの質問に関連する情報をテキストにする。",
+      "inputs": [
+        "image"
+      ],
+      "outputs": [
+        "description"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#4a6282",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "transcribe",
+      "name": "文字起こし",
+      "kind": "model",
+      "x": 300,
+      "y": 200,
+      "path": "",
+      "command": "",
+      "description": "音声認識で文字起こしする。認識できない場合はエラーを返す。",
+      "inputs": [
+        "audio"
+      ],
+      "outputs": [
+        "transcript"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#715669",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "agent",
+      "name": "LLMエージェント",
+      "kind": "model",
+      "x": 620,
+      "y": 160,
+      "path": "",
+      "command": "",
+      "description": "同じリクエストの画像説明・文字起こし・テキストをまとめて推論する。各入力は任意。必要に応じてツールを呼び、結果を踏まえて最終応答を返す。",
+      "inputs": [
+        "image_context",
+        "audio_text",
+        "text"
+      ],
+      "outputs": [
+        "tool_call",
+        "response"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#416762",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "tools",
+      "name": "ツール実行",
+      "kind": "service",
+      "x": 940,
+      "y": 0,
+      "path": "",
+      "command": "",
+      "description": "許可された検索・計算などのツールを実行する。引数を検証し結果またはエラーを返す。",
+      "inputs": [
+        "request"
+      ],
+      "outputs": [
+        "result"
+      ],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#80602d",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    },
+    {
+      "id": "response",
+      "name": "応答表示",
+      "kind": "application",
+      "x": 940,
+      "y": 340,
+      "path": "",
+      "command": "",
+      "description": "最終テキストをユーザーに表示する。",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [],
+      "policy": "mutable",
+      "appearance": {
+        "color": "#4a6282",
+        "radius": 8,
+        "corners": "uniform",
+        "surface": "filled",
+        "header": "plain"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_01",
+      "source": "image",
+      "target": "vision",
+      "sourcePort": "image",
+      "targetPort": "image",
+      "label": "画像",
+      "intent": "画像データとMIMEタイプを渡す。サイズと形式を検証する。",
+      "mode": "data",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_02",
+      "source": "audio",
+      "target": "transcribe",
+      "sourcePort": "audio",
+      "targetPort": "audio",
+      "label": "音声",
+      "intent": "音声データとサンプルレートを渡す。形式を検証する。",
+      "mode": "data",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_03",
+      "source": "vision",
+      "target": "agent",
+      "sourcePort": "description",
+      "targetPort": "image_context",
+      "label": "画像の説明",
+      "intent": "画像の説明をrequest_idとともに渡す。",
+      "mode": "data",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_04",
+      "source": "transcribe",
+      "target": "agent",
+      "sourcePort": "transcript",
+      "targetPort": "audio_text",
+      "label": "文字起こし",
+      "intent": "認識したテキストをrequest_idとともに渡す。",
+      "mode": "data",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_05",
+      "source": "text",
+      "target": "agent",
+      "sourcePort": "text",
+      "targetPort": "text",
+      "label": "ユーザーの指示",
+      "intent": "入力テキストをrequest_idとともに渡す。入力されていないモダリティは待たない。",
+      "mode": "data",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_06",
+      "source": "agent",
+      "target": "tools",
+      "sourcePort": "tool_call",
+      "targetPort": "request",
+      "label": "ツール呼び出し",
+      "intent": "ツール名・引数・call_idを送り、同じ呼び出しの結果またはエラーを応答として受け取る。タイムアウトと最大呼び出し回数を設ける。",
+      "mode": "request",
+      "policy": "mutable"
+    },
+    {
+      "id": "edge_07",
+      "source": "agent",
+      "target": "response",
+      "sourcePort": "response",
+      "targetPort": "text",
+      "label": "最終応答",
+      "intent": "最終テキストを渡して表示する。失敗時にはエラーを表示する。",
+      "mode": "data",
+      "policy": "mutable"
+    }
+  ]
+}

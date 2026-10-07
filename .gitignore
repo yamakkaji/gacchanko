@@ -10,3 +10,6 @@ __pycache__/
 
 # Runtime history belongs to each integration project, not the app source repo.
 **/.gacchanko/
+
+# Archived legacy artifacts are retained locally.
+/legacy/

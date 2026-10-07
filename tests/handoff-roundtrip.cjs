@@ -11,7 +11,7 @@ const dom=new JSDOM(fs.readFileSync(path.join(repo,'web/index.html'),'utf8'),{ur
 const w=dom.window;
 w.HTMLElement.prototype.getBoundingClientRect=function(){return {left:0,top:0,right:900,bottom:700,width:900,height:700};};
 w.gacchankoPlatform={kind:'real-store-test',async request(command){if(['state','poll','reload'].includes(command))return state();if(command==='dirty')return true;throw Error('Unexpected command '+command);},on(){return ()=>{};}};
-for(const name of ['bridge.js','appearance.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(repo,'web',name),'utf8'));
+for(const name of ['bridge.js','appearance.js','node-appearance.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(repo,'web',name),'utf8'));
 (async()=>{
  try{
   await w.gacchankoReady;

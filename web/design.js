@@ -6,7 +6,7 @@ window.gacchankoDesign = (() => {
     return item && !Array.isArray(item) && typeof item==='object' ? Object.fromEntries(Object.keys(item).sort().map(k=>[k,item[k]])) : item;
   });
   const locked = item => ['immutable','template'].includes(item?.policy);
-  const definition = item => { if(!item)return null;const result=copy(item);delete result.x;delete result.y;return result; };
+  const definition = item => { if(!item)return null;const result=copy(item);delete result.x;delete result.y;delete result.appearance;return result; };
   function violations(before,after) {
     const result=[];
     for(const n of before.nodes.filter(locked)) {

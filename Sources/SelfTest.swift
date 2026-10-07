@@ -66,6 +66,16 @@ func runSelfTests() throws {
     try check((implementationDetail["files"] as? [String])?.contains("implementations/e1/adapter.py") == true, "history lists actual changed implementation files")
     design.nodes[0].policy = "immutable"; design.edges[0].policy = "immutable"
     _ = try versions.save(design, expectedRevision: versions.revision)
+    let lockedHash = try fingerprint(design.edges[0], design)
+    design.nodes[0].appearance = NodeAppearance(color: "#715669", radius: 24, corners: "alternating", surface: "filled", header: "plain")
+    _ = try versions.save(design, expectedRevision: versions.revision)
+    let styledReader = ProjectStore(); _ = try styledReader.open(versions.root!)
+    try check(styledReader.graph!.nodes[0].appearance?.radius == 24, "immutable node appearance saves and reloads")
+    try check(try fingerprint(design.edges[0], design) == lockedHash, "appearance preserves implementation fingerprint")
+    var invalidStyle = design; invalidStyle.nodes[0].appearance!.color = "red; color:red"
+    try rejects("unsafe node color rejected") { try validate(invalidStyle) }
+    invalidStyle = design; invalidStyle.nodes[0].appearance!.radius = 29
+    try rejects("out of range node radius rejected") { try validate(invalidStyle) }
     let lockedCommit = try versions.history!.head()
     var edited = design; edited.nodes[0].description = "unauthorized"
     try rejects("locked definition cannot be edited in store") { _ = try versions.save(edited, expectedRevision: versions.revision) }

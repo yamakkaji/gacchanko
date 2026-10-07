@@ -7,6 +7,13 @@ struct TemplateOrigin: Codable {
     var version: Int
     var memberID: String
 }
+struct NodeAppearance: Codable {
+    var color: String
+    var radius: Double
+    var corners: String
+    var surface: String
+    var header: String
+}
 struct PatchNode: Codable {
     var id: String
     var name: String
@@ -21,6 +28,7 @@ struct PatchNode: Codable {
     var policy: String? = nil
     var designInstructions: String? = nil
     var derivedFrom: TemplateOrigin? = nil
+    var appearance: NodeAppearance? = nil
 }
 struct PatchEdge: Codable {
     var id: String
@@ -85,6 +93,11 @@ func validate(_ graph: PatchGraph) throws {
     guard Set(ids).count == ids.count, ids.allSatisfy(validID) else { throw PatchError("ノードIDが重複しているか、使用できない文字を含んでいます。") }
     guard Set(graph.edges.map(\.id)).count == graph.edges.count, graph.edges.map(\.id).allSatisfy(validID) else { throw PatchError("接続IDが不正です。") }
     for node in graph.nodes {
+        if let a = node.appearance {
+            guard a.color.range(of: "^#[0-9a-fA-F]{6}$", options: .regularExpression) != nil,
+                  a.radius.isFinite, (0...28).contains(a.radius), ["uniform", "alternating"].contains(a.corners),
+                  ["filled", "outlined", "elevated"].contains(a.surface), ["striped", "plain"].contains(a.header) else { throw PatchError("ノードの外観設定が不正です。") }
+        }
         guard node.x.isFinite, node.y.isFinite, abs(node.x) < 1e7, abs(node.y) < 1e7,
               !node.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               node.inputs.count <= 30, node.outputs.count <= 30,
@@ -100,7 +113,7 @@ func validate(_ graph: PatchGraph) throws {
 }
 func fingerprint(_ edge: PatchEdge, _ graph: PatchGraph) throws -> String {
     var nodes = graph.nodes.filter { $0.id == edge.source || $0.id == edge.target }
-    for i in nodes.indices { nodes[i].x = 0; nodes[i].y = 0 }
+    for i in nodes.indices { nodes[i].x = 0; nodes[i].y = 0; nodes[i].appearance = nil }
     let payload: [String: Any] = ["edge": try object(edge), "nodes": try nodes.sorted { $0.id < $1.id }.map { try object($0) }, "projectDescription": graph.description]
     return digest(try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .withoutEscapingSlashes]))
 }
@@ -209,7 +222,7 @@ final class ProjectStore {
         - `verified` means you actually ran relevant checks. For incomplete work use `blocked` and explain what is missing. Do not claim runtime integration has passed from a syntax check alone.
         - The GUI reloads reports automatically. Changed requirements mark earlier reports stale. Reports are agent-provided evidence, not independent certification.
         - Do not modify generated AGENT_BRIEF.md, graph.mmd, or connections/*/SPEC.md. To change the design, edit graph.json (schemaVersion 1), preserve IDs, and save atomically. The GUI detects external edits. Deleted edges' implementation files are intentionally retained; only graph.json determines active edges.
-        - Every node and edge has `policy`: omitted or `mutable` permits edits; `immutable` and `template` protect its definition and existing wiring. Layout may move. Do not remove protection yourself or edit history. Ask the user to unlock in the GUI when needed. Existing protected nodes may receive NEW connections through their declared ports, but existing connections cannot be removed or rewired without unlocking their protected endpoints.
+        - Every node and edge has `policy`: omitted or `mutable` permits edits; `immutable` and `template` protect its definition and existing wiring. Layout and node appearance may change without unlocking and do not invalidate implementation reports. Appearance is visual metadata, not behaviour. Do not remove protection yourself or edit history. Ask the user to unlock in the GUI when needed. Existing protected nodes may receive NEW connections through their declared ports, but existing connections cannot be removed or rewired without unlocking their protected endpoints.
         - A protected edge also freezes `implementations/<edge-id>/` as of the accepted version. Do not create, alter or delete code there without asking the user to unlock the edge. Reports remain writable; shared code is not covered by an individual edge lock. Referenced source repositories are not OS-locked by gacchanko.
         - `template` means an architectural prototype, not a blank starting point. Read `designInstructions`, the pinned `derivedFrom` reference, and `templates[].instructions`. Reuse its member roles, ports and internal topology when designing a variant. Explain intentional deviations in the variant's designInstructions. These are design constraints, not C++ code generation.
         - `templates` holds versioned, self-contained subgraphs. Existing versions are append-only. To create a variant, copy its nodes AND internal edges with new IDs, remap endpoints, and set each member's derivedFrom to {templateID, version, memberID}. Use mutable for variant members. Preserve the pinned version; do not silently upgrade it. To revise a prototype, append a new version.
@@ -361,8 +374,8 @@ func protected(_ policy: String?) -> Bool { ["immutable", "template"].contains(p
 func protectionViolations(_ old: PatchGraph, _ next: PatchGraph, unlocked: Set<String> = []) throws -> [String] {
     var violations: [String] = []
     for n in old.nodes where protected(n.policy) && !unlocked.contains("node:" + n.id) {
-        var before = n; before.x = 0; before.y = 0
-        var after = next.nodes.first { $0.id == n.id }; after?.x = 0; after?.y = 0
+        var before = n; before.x = 0; before.y = 0; before.appearance = nil
+        var after = next.nodes.first { $0.id == n.id }; after?.x = 0; after?.y = 0; after?.appearance = nil
         if try after.map({ try jsonData($0) }) != jsonData(before) { violations.append("node:" + n.id) }
         for edge in old.edges where edge.source == n.id || edge.target == n.id {
             let other = next.edges.first { $0.id == edge.id }

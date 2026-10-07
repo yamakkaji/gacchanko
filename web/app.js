@@ -7,6 +7,8 @@ const uid = prefix => prefix + '_' + crypto.randomUUID().slice(0, 8);
 const host = window.gacchankoHost;
 const native = host.available;
 const appearance=window.gacchankoAppearance;
+const design=window.gacchankoDesign;
+let historyState={}, savedGraph=null, pendingExternal=null, changeOverlay=null, overlayFiles=null;
 let edgeAppearance=appearance.load();
 const call = (command, args={}) => host.request(command,args);
 const emptyGraph = () => ({schemaVersion:1,name:'Untitled project',description:'',nodes:[],edges:[]});
@@ -22,7 +24,11 @@ function toast(message,error=false) {
 }
 function safe(action) { return (...args)=>Promise.resolve().then(()=>action(...args)).catch(e=>toast(e.message,true)); }
 function remember() { undoStack.push(clone(graph)); if(undoStack.length>60)undoStack.shift(); redoStack=[]; }
-function mutate(action,{inspector=true}={}) { remember(); action(); markDirty(); render(inspector); }
+function mutate(action,{inspector=true}={}) {
+  const before=clone(graph);action();
+  if(design.violations(before,graph).length){graph=before;toast('保護された要素・接続は変更できません。先に保護を解除してください。',true);render(true);return false;}
+  undoStack.push(before);if(undoStack.length>60)undoStack.shift();redoStack=[];markDirty();render(inspector);return true;
+}
 function markDirty() {
   dirty=true; editSerial++; call('dirty',{value:true}).catch(()=>{});
   try { localStorage.setItem('gacchanko-draft',JSON.stringify({graph,root,revision})); } catch { if(!draftBackupError){draftBackupError=true;toast('一時バックアップを保存できません。保存ボタンでプロジェクトを保存してください。',true);} }
@@ -32,12 +38,13 @@ function markDirty() {
 function cleanState(state,{replace=true}={}) {
   if(replace){clearConnection(false);graph=state.project;selected=null;undoStack=[];redoStack=[];}
   root=state.root;revision=state.revision;reports=state.reports||{};fingerprints=state.fingerprints||{};dirty=false;external=false;
-  $('#external-banner').hidden=true; call('dirty',{value:false}).catch(()=>{});
+  savedGraph=clone(state.project);historyState=state.history||{};changeOverlay=null;overlayFiles=null;pendingExternal=state.pendingExternal||null;external=!!pendingExternal;updateExternalBanner(); call('dirty',{value:false}).catch(()=>{});
   try {localStorage.removeItem('gacchanko-draft');localStorage.removeItem('patchwork-draft');}catch{}
   render(true);
 }
 async function save(interactive=true) {
   clearTimeout(saveTimer);
+  if(external)throw Error('外部の変更を確認してから保存してください。');
   if(saveTask){await saveTask;if(dirty)return save(interactive);return true;}
   if(!root&&!interactive)return false;
   const serial=editSerial;
@@ -50,7 +57,7 @@ async function save(interactive=true) {
     root=state.root;revision=state.revision;reports=state.reports||{};fingerprints=state.fingerprints||{};
     if(serial===editSerial){dirty=false;call('dirty',{value:false}).catch(()=>{});try{localStorage.removeItem('gacchanko-draft');localStorage.removeItem('patchwork-draft');}catch{}}
     else {dirty=true;call('dirty',{value:true}).catch(()=>{});saveTimer=setTimeout(()=>save(false).catch(e=>toast(e.message,true)),100);}
-    updateHeader();if(wasNew)renderInspector(true);return true;
+    savedGraph=clone(outgoing);historyState=state.history||{};changeOverlay=null;overlayFiles=null;applyChangeOverlay();updateHeader();if(wasNew)renderInspector(true);return true;
   } catch(e){$('#save-state').textContent='保存できません';throw e;}
   finally{saveTask=null;}
 }
@@ -60,6 +67,7 @@ function updateHeader(){
   $('#save-state').textContent=dirty?(root?'変更あり':'未保存'):(root?'保存済み':'未保存');
   $('#node-count').textContent=graph.nodes.length;$('#edge-count').textContent=`${graph.edges.length} connections`;
   $('#ready-count').textContent=`${graph.edges.filter(e=>status(e.id)==='verified').length} verified`;
+  $('#show-history').textContent=(historyState.protectedFiles?.length?'⚠ 保護された実装に変更':'変更履歴')+(historyState.head?' · '+historyState.head.slice(0,7):'');
   $('#undo').disabled=!undoStack.length;$('#redo').disabled=!redoStack.length;
 }
 function status(id){return reports[id]?.status||'pending';}
@@ -87,7 +95,7 @@ function beginDrag(event,state){
 function renderEdges(){
   $('#edge-paths').innerHTML=graph.edges.map((e,index)=>{
     const a=portPoint(e.source,e.sourcePort,'out'),b=portPoint(e.target,e.targetPort,'in');
-    const x=(a.x+b.x)/2,y=(a.y+b.y)/2, label=(e.mode==='request'?'↔ ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
+    const x=(a.x+b.x)/2,y=(a.y+b.y)/2, label=(design.locked(e)?(e.policy==='template'?'◇ ':'🔒 '):e.derivedFrom?'↳ ':'')+(e.mode==='request'?'↔ ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
     const colour={verified:'#416762',implemented:'#715669',stale:'#9a6a23',blocked:'#a54844'}[status(e.id)]||'#486080';
     return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${curve(a,b)}"/>${appearance.render(a,b,{settings:edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
   }).join('')+connectionPreview();
@@ -95,10 +103,10 @@ function renderEdges(){
     el.classList.toggle('reconnecting',connecting?.edgeID===el.dataset.edge);
     el.addEventListener('pointerdown',e=>{if(e.button!==0||spacePressed)return;e.stopPropagation();e.preventDefault();if(connecting)clearConnection();$('#canvas').focus({preventScroll:true});select('edge',el.dataset.edge);});
   });
-  renderConnectionHandles();updatePortStates();
+  renderConnectionHandles();updatePortStates();applyChangeOverlay();
 }
 function renderNodes(){
-  $('#nodes').innerHTML=graph.nodes.map(n=>`<div class="node ${esc(n.kind)} ${selectedNodeIDs().includes(n.id)?'selected':''}" style="left:${n.x}px;top:${n.y}px" data-node="${esc(n.id)}"><div class="node-head"><div class="node-symbol">${symbols[n.kind]||'◇'}</div><div class="node-info"><div class="node-kind">${esc(n.kind)}</div><div class="node-name" title="${esc(n.name)}">${esc(n.name)}</div></div><span class="node-menu">···</span></div><div class="node-path ${n.path?'':'unresolved'}" title="${esc(n.path)}">${esc(n.path||'参照先を設定してください')}</div>${Array.from({length:Math.max(n.inputs.length,n.outputs.length,1)},(_,i)=>`<div class="port-row">${n.inputs[i]?`<div class="port-side"><button aria-label="${esc(n.name)} input ${esc(n.inputs[i])}" class="port in" data-direction="in" data-port="${esc(n.inputs[i])}"></button><span>${esc(n.inputs[i])}</span></div>`:''}${n.outputs[i]?`<div class="port-side out"><span>${esc(n.outputs[i])}</span><button aria-label="${esc(n.name)} output ${esc(n.outputs[i])}" class="port out" data-direction="out" data-port="${esc(n.outputs[i])}"></button></div>`:''}</div>`).join('')}</div>`).join('');
+  $('#nodes').innerHTML=graph.nodes.map(n=>`<div class="node ${esc(n.kind)} ${selectedNodeIDs().includes(n.id)?'selected':''}" style="left:${n.x}px;top:${n.y}px" data-node="${esc(n.id)}"><div class="node-head"><div class="node-symbol">${symbols[n.kind]||'◇'}</div><div class="node-info"><div class="node-kind">${esc(n.kind)}</div><div class="node-name" title="${esc(n.name)}">${esc(n.name)}</div></div><span class="node-menu policy-badge" title="${esc(n.policy||'mutable')}">${n.policy==='immutable'?'🔒':n.policy==='template'?'◇':n.derivedFrom?'↳':'···'}</span></div><div class="node-path ${n.path?'':'unresolved'}" title="${esc(n.path)}">${esc(n.path||'参照先を設定してください')}</div>${Array.from({length:Math.max(n.inputs.length,n.outputs.length,1)},(_,i)=>`<div class="port-row">${n.inputs[i]?`<div class="port-side"><button aria-label="${esc(n.name)} input ${esc(n.inputs[i])}" class="port in" data-direction="in" data-port="${esc(n.inputs[i])}"></button><span>${esc(n.inputs[i])}</span></div>`:''}${n.outputs[i]?`<div class="port-side out"><span>${esc(n.outputs[i])}</span><button aria-label="${esc(n.name)} output ${esc(n.outputs[i])}" class="port out" data-direction="out" data-port="${esc(n.outputs[i])}"></button></div>`:''}</div>`).join('')}</div>`).join('');
   $$('.node').forEach(el=>{
     el.addEventListener('pointerdown',e=>{
       if(drag||e.button!==0||spacePressed||e.target.closest('.port'))return;
@@ -151,6 +159,8 @@ function validCandidate(candidate){
   const n=graph.nodes.find(n=>n.id===candidate.node);
   if(!n||(candidate.direction==='in'?!n.inputs.includes(candidate.port):!n.outputs.includes(candidate.port)))return false;
   const next=connectionEndpoints(candidate);
+  const old=graph.edges.find(e=>e.id===connecting.edgeID);
+  if(old&&(design.locked(old)||graph.nodes.some(n=>[old.source,old.target].includes(n.id)&&design.locked(n)))&&Object.keys(next).some(k=>next[k]!==old[k]))return false;
   return !graph.edges.some(e=>e.id!==connecting.edgeID&&e.source===next.source&&e.target===next.target&&e.sourcePort===next.sourcePort&&e.targetPort===next.targetPort);
 }
 function nearestPort(clientX,clientY){
@@ -175,6 +185,7 @@ function updatePortStates(){
   });
 }
 function beginConnection(event,moving,edge=null,port=null){
+  if(edge&&(design.locked(edge)||graph.nodes.some(n=>[edge.source,edge.target].includes(n.id)&&design.locked(n)))){toast('保護された接続です。付け替えるには保護を解除してください。',true);return;}
   clearConnection(false);
   const fixed=edge?(moving==='target'?{node:edge.source,port:edge.sourcePort,direction:'out'}:{node:edge.target,port:edge.targetPort,direction:'in'}):port;
   const point=edge?portPoint(moving==='target'?edge.target:edge.source,moving==='target'?edge.targetPort:edge.sourcePort,moving==='target'?'in':'out'):portPoint(port.node,port.port,port.direction);
@@ -215,7 +226,7 @@ function connectionPreview(){
 }
 function renderConnectionHandles(){
   const edge=selected?.type==='edge'?graph.edges.find(e=>e.id===selected.id):null;
-  $('#edge-handles').innerHTML=!edge||connecting?'':['source','target'].map(end=>{
+  $('#edge-handles').innerHTML=!edge||design.locked(edge)||graph.nodes.some(n=>[edge.source,edge.target].includes(n.id)&&design.locked(n))||connecting?'':['source','target'].map(end=>{
     const point=portPoint(edge[end],edge[end+'Port'],end==='source'?'out':'in');
     return `<circle class="edge-endpoint" data-reconnect="${end}" cx="${point.x}" cy="${point.y}" r="${7/view.zoom}" vector-effect="non-scaling-stroke"><title>${end==='source'?'出力':'入力'}側を付け替え</title></circle>`;
   }).join('');
@@ -226,12 +237,12 @@ function renderConnectionHandles(){
 function createConnection(source,target,sourcePort,targetPort){
   clearConnection(false);
   if(graph.edges.some(e=>e.source===source&&e.target===target&&e.sourcePort===sourcePort&&e.targetPort===targetPort)){toast('このポート間の接続はすでにあります。');renderEdges();return;}
-  const edge={id:uid('edge'),source,target,sourcePort,targetPort,label:'新しい接続',intent:'',mode:'data'};
+  const edge={id:uid('edge'),source,target,sourcePort,targetPort,label:'新しい接続',intent:'',mode:'data',policy:'mutable',designInstructions:''};
   mutate(()=>{graph.edges.push(edge);selected={type:'edge',id:edge.id};});
   setTimeout(()=>$('#edge-intent')?.focus(),30);
 }
 function invalidateEdges(nodeID,edgeID){for(const e of graph.edges){if((edgeID&&e.id===edgeID)||(nodeID&&(e.source===nodeID||e.target===nodeID))){if(reports[e.id])reports[e.id]={...reports[e.id],status:'stale'};}}}
-function makeNode(values={},point){const r=$('#canvas').getBoundingClientRect();const pos=point||canvasPoint(r.left+r.width/2-112,r.top+r.height/2-70);return{id:uid('node'),name:'New component',path:'',kind:'directory',description:'',command:'',inputs:['in'],outputs:['out'],x:pos.x,y:pos.y,...values};}
+function makeNode(values={},point){const r=$('#canvas').getBoundingClientRect();const pos=point||canvasPoint(r.left+r.width/2-112,r.top+r.height/2-70);return{id:uid('node'),name:'New component',path:'',kind:'directory',description:'',command:'',inputs:['in'],outputs:['out'],policy:'mutable',designInstructions:'',x:pos.x,y:pos.y,...values};}
 async function addPaths(paths,position){const values=[];for(const path of paths){try{values.push(await call('inspect',{path}));}catch(e){toast(e.message,true);}}
   if(!values.length)return;
   mutate(()=>{for(const [i,value]of values.entries()){const {files,...fields}=value;const p=position?{x:position.x+i*32,y:position.y+i*40}:undefined;const n=makeNode(fields,p);graph.nodes.push(n);selected={type:'node',id:n.id};}});
@@ -242,7 +253,7 @@ function field(label,id,value,{textarea=false,hint='',cls=''}={}){return `<label
 function bindText(id, read, apply, required=false){
   const element=$('#'+id);let checkpoint=false;
   element.onfocus=()=>{checkpoint=false;};
-  const edit=()=>{const value=element.value;if(required&&!value.trim())return;if(value===read())return;
+  const edit=()=>{if(element.disabled)return;const value=element.value;if(required&&!value.trim())return;if(value===read())return;
     if(!checkpoint){remember();checkpoint=true;}apply(value);markDirty();render(false);
   };
   element.oninput=edit;element.onchange=edit;
@@ -280,6 +291,7 @@ function renderInspector(force=false){
     if($('#copy-location'))$('#copy-location').onclick=safe(async()=>{await call('copy',{text:root});toast('パスをコピーしました。');});
   }
   if($('#delete-selected'))$('#delete-selected').onclick=safe(deleteSelected);
+  renderDesignInspector();
 }
 function appearanceSettings(){
   const s=edgeAppearance;
@@ -329,11 +341,13 @@ function addDialog(){modal(`<h2>コンポーネントを追加</h2><button type=
 async function handoff(edgeID){document.activeElement?.blur();if(!await save(true))return;const prompt=await call('copyPrompt',{edgeID});modal(`<h2>依頼文をコピーしました</h2><pre>${esc(prompt)}</pre><div class="modal-actions"><button>閉じる</button><button type="button" id="copy-again" class="primary">もう一度コピー</button></div>`);$('#copy-again').onclick=safe(async()=>{await call('copy',{text:prompt});toast('依頼文をコピーしました。');});}
 function exampleGraph(){return {"schemaVersion":1,"name":"Multimodal LLM agent","description":"画像・音声・テキストを入力できるシンプルなLLMエージェントの設計例。画像理解と文字起こしを経てLLMへ渡し、必要に応じてツールを呼び出して応答する。参照先・モデル・実装は未設定。","nodes":[{"id":"image","name":"画像入力","kind":"note","x":0,"y":0,"path":"","command":"","description":"ユーザーが選んだ画像をMIMEタイプとともに渡す。","inputs":[],"outputs":["image"],"policy":"mutable","appearance":{"color":"#4a6282","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"audio","name":"音声入力","kind":"note","x":0,"y":200,"path":"","command":"","description":"録音または音声ファイルをサンプルレートとともに渡す。","inputs":[],"outputs":["audio"],"policy":"mutable","appearance":{"color":"#715669","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"text","name":"テキスト入力","kind":"note","x":0,"y":400,"path":"","command":"","description":"ユーザーの質問や指示を文字列として渡す。","inputs":[],"outputs":["text"],"policy":"mutable","appearance":{"color":"#416762","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"vision","name":"画像理解","kind":"model","x":300,"y":0,"path":"","command":"","description":"画像を解釈し、内容とユーザーの質問に関連する情報をテキストにする。","inputs":["image"],"outputs":["description"],"policy":"mutable","appearance":{"color":"#4a6282","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"transcribe","name":"文字起こし","kind":"model","x":300,"y":200,"path":"","command":"","description":"音声認識で文字起こしする。認識できない場合はエラーを返す。","inputs":["audio"],"outputs":["transcript"],"policy":"mutable","appearance":{"color":"#715669","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"agent","name":"LLMエージェント","kind":"model","x":620,"y":160,"path":"","command":"","description":"同じリクエストの画像説明・文字起こし・テキストをまとめて推論する。各入力は任意。必要に応じてツールを呼び、結果を踏まえて最終応答を返す。","inputs":["image_context","audio_text","text"],"outputs":["tool_call","response"],"policy":"mutable","appearance":{"color":"#416762","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"tools","name":"ツール実行","kind":"service","x":940,"y":0,"path":"","command":"","description":"許可された検索・計算などのツールを実行する。引数を検証し結果またはエラーを返す。","inputs":["request"],"outputs":["result"],"policy":"mutable","appearance":{"color":"#80602d","radius":8,"corners":"uniform","surface":"filled","header":"plain"}},{"id":"response","name":"応答表示","kind":"application","x":940,"y":340,"path":"","command":"","description":"最終テキストをユーザーに表示する。","inputs":["text"],"outputs":[],"policy":"mutable","appearance":{"color":"#4a6282","radius":8,"corners":"uniform","surface":"filled","header":"plain"}}],"edges":[{"id":"edge_01","source":"image","target":"vision","sourcePort":"image","targetPort":"image","label":"画像","intent":"画像データとMIMEタイプを渡す。サイズと形式を検証する。","mode":"data","policy":"mutable"},{"id":"edge_02","source":"audio","target":"transcribe","sourcePort":"audio","targetPort":"audio","label":"音声","intent":"音声データとサンプルレートを渡す。形式を検証する。","mode":"data","policy":"mutable"},{"id":"edge_03","source":"vision","target":"agent","sourcePort":"description","targetPort":"image_context","label":"画像の説明","intent":"画像の説明をrequest_idとともに渡す。","mode":"data","policy":"mutable"},{"id":"edge_04","source":"transcribe","target":"agent","sourcePort":"transcript","targetPort":"audio_text","label":"文字起こし","intent":"認識したテキストをrequest_idとともに渡す。","mode":"data","policy":"mutable"},{"id":"edge_05","source":"text","target":"agent","sourcePort":"text","targetPort":"text","label":"ユーザーの指示","intent":"入力テキストをrequest_idとともに渡す。入力されていないモダリティは待たない。","mode":"data","policy":"mutable"},{"id":"edge_06","source":"agent","target":"tools","sourcePort":"tool_call","targetPort":"request","label":"ツール呼び出し","intent":"ツール名・引数・call_idを送り、同じ呼び出しの結果またはエラーを応答として受け取る。タイムアウトと最大呼び出し回数を設ける。","mode":"request","policy":"mutable"},{"id":"edge_07","source":"agent","target":"response","sourcePort":"response","targetPort":"text","label":"最終応答","intent":"最終テキストを渡して表示する。失敗時にはエラーを表示する。","mode":"data","policy":"mutable"}]};}
 
-async function replaceDraft(next){if(dirty&&!root&&!await confirmChoice('現在の未保存のグラフを置き換えます。'))return;if(root&&dirty){if(!await save(true))return;}clearConnection(false);root='';revision='';reports={};fingerprints={};selected=null;external=false;$('#external-banner').hidden=true;undoStack=[];redoStack=[];graph=next;markDirty();render();fit();}
-async function poll(){if(!root||saveTask)return;try{const state=await call('poll');if(state.externalChange){external=true;$('#external-banner').hidden=false;clearTimeout(saveTimer);if(!dirty&&!drag&&!connecting&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'')){
+async function replaceDraft(next){if(dirty&&!root&&!await confirmChoice('現在の未保存のグラフを置き換えます。'))return;if(root&&dirty){if(!await save(true))return;}clearConnection(false);historyState={};savedGraph=null;pendingExternal=null;changeOverlay=null;overlayFiles=null;root='';revision='';reports={};fingerprints={};selected=null;external=false;$('#external-banner').hidden=true;undoStack=[];redoStack=[];graph=next;markDirty();render();fit();}
+async function poll(){if(!root||saveTask)return;try{const state=await call('poll');if(state.externalChange){external=true;pendingExternal=state;updateExternalBanner();clearTimeout(saveTimer);if(!state.violations?.length&&!dirty&&!drag&&!connecting&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'')){
   const selectedBefore=selected;const refreshed=await call('reload');cleanState(refreshed);selected=selectedBefore;render(true);$('#status-text').textContent='エージェントによるグラフの変更を反映しました。';
  }return;}
+ if(external){external=false;pendingExternal=null;changeOverlay=null;overlayFiles=null;updateExternalBanner();if(dirty){clearTimeout(saveTimer);saveTimer=setTimeout(()=>save(false).catch(e=>toast(e.message,true)),850);}}
  if(dirty||drag||connecting)return;
+ if(JSON.stringify(state.history)!==JSON.stringify(historyState)){historyState=state.history||{};changeOverlay=null;overlayFiles=null;applyChangeOverlay();updateHeader();}
  if(JSON.stringify(reports)!==JSON.stringify(state.reports)){reports=state.reports||{};fingerprints=state.fingerprints||{};updateHeader();renderEdges();if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||''))renderInspector(true);$('#status-text').textContent='実装レポートを更新しました。';}
 }catch(e){$('#status-text').textContent=e.message;}}
 $('#canvas').addEventListener('pointerdown',e=>{
@@ -402,8 +416,8 @@ $('#canvas').addEventListener('dragleave',()=>$('#canvas').classList.remove('dra
 $('#canvas').addEventListener('drop',safe(async e=>{e.preventDefault();$('#canvas').classList.remove('drag-over');const text=e.dataTransfer.getData('text/uri-list')||e.dataTransfer.getData('text/plain');if(text&&/^https?:\/\//.test(text))await addPaths([text.trim()],canvasPoint(e.clientX,e.clientY));}));
 host.on('drop',safe(async detail=>{const r=$('#canvas').getBoundingClientRect();$('#canvas').classList.remove('drag-over');if(detail.x<r.left||detail.x>r.right||detail.y<r.top||detail.y>r.bottom){toast('中央のキャンバスにドロップしてください。');return;}await addPaths(detail.paths,canvasPoint(detail.x,detail.y));})).catch(e=>toast(e.message,true));
 host.on('error',message=>toast(message,true)).catch(e=>toast(e.message,true));
-function undo(){clearConnection(false);if(!undoStack.length)return;redoStack.push(clone(graph));graph=undoStack.pop();selected=null;markDirty();render();}
-function redo(){clearConnection(false);if(!redoStack.length)return;undoStack.push(clone(graph));graph=redoStack.pop();selected=null;markDirty();render();}
+function undo(){clearConnection(false);if(!undoStack.length)return;redoStack.push(clone(graph));const next=undoStack[undoStack.length-1];if(design.violations(graph,next).length){redoStack.pop();toast('保護された設計はUndoできません。先に保護を解除してください。',true);return;}graph=undoStack.pop();selected=null;markDirty();render();}
+function redo(){clearConnection(false);if(!redoStack.length)return;undoStack.push(clone(graph));const next=redoStack[redoStack.length-1];if(design.violations(graph,next).length){undoStack.pop();toast('保護された設計はRedoできません。先に保護を解除してください。',true);return;}graph=redoStack.pop();selected=null;markDirty();render();}
 $('#zoom-in').onclick=()=>zoomBy(1.2);$('#zoom-out').onclick=()=>zoomBy(1/1.2);$('#fit-view').onclick=fit;$('#undo').onclick=undo;$('#redo').onclick=redo;
 $('#add-node').onclick=addDialog;$('#empty-add').onclick=safe(chooseNodes);$('#save-project').onclick=safe(()=>save(true));$('#handoff').onclick=safe(()=>handoff());
 $('#new-project').onclick=safe(()=>replaceDraft(emptyGraph()));$('#load-example').onclick=safe(()=>replaceDraft(exampleGraph()));
@@ -424,3 +438,95 @@ window.addEventListener('keydown',e=>{
 window.gacchanko={call,get graph(){return graph;},get root(){return root;},get reports(){return reports;},makeNode,mutate,createConnection,select,save,poll,cleanState,fit,render,exampleGraph,addPaths,undo,redo,status,replaceDraft};
 async function init(){render();if(native){const state=await call('state');if(state.project){cleanState(state);fit();}else{try{const backup=JSON.parse(localStorage.getItem('gacchanko-draft')||localStorage.getItem('patchwork-draft')||'null');if(backup?.graph&&await confirmChoice('前回の未保存の編集を復元しますか？')){graph=backup.graph;root='';revision='';markDirty();render();fit();}}catch(e){toast(e.message,true);}}}setInterval(poll,2000);}
 window.gacchankoReady=init().catch(e=>toast(e.message,true));
+
+function updateExternalBanner(){
+  $('#external-banner').hidden=!pendingExternal;
+  const blocked=!!pendingExternal?.violations?.length;
+  $('#external-message').textContent=blocked?'保護対象または不正な設計への変更を検出しました。未採用です。':'外部でグラフが更新されました。';
+  $('#reload-project').disabled=blocked;
+}
+function applyChangeOverlay(){
+  if(!design)return;
+  const changes=changeOverlay||[...(historyState.changes||[]),...(savedGraph&&dirty?design.changes(savedGraph,graph):[])];
+  for(const [selector,kind,key]of [['.node','node','node'],['.edge-group','edge','edge']])for(const el of $$(selector)){
+    const change=changes.filter(c=>c.kind===kind&&c.id===el.dataset[key]).at(-1);
+    el.dataset.change=change?.change||'';
+    const codeChanged=kind==='edge'&&(overlayFiles??historyState.files??[]).some(p=>p.startsWith('implementations/'+el.dataset[key]+'/'));
+    el.classList.toggle('implementation-changed',codeChanged);
+  }
+}
+function renderDesignInspector(){
+  const kind=selected?.type;
+  if(kind==='nodes'){
+    $('#inspector').insertAdjacentHTML('beforeend','<button class="wide-button" id="capture-template">選択した構成を原型に登録</button>');
+    $('#capture-template').onclick=()=>captureTemplateDialog(selectedNodeIDs());return;
+  }
+  if(!['node','edge'].includes(kind))return;
+  const item=(kind==='node'?graph.nodes:graph.edges).find(v=>v.id===selected.id);
+  if(!item)return;
+  const locked=design.locked(item),panel=$('#inspector');
+  if(locked)for(const control of $$('input,textarea,select,#set-node-path,#delete-selected',panel))control.disabled=true;
+  const origin=item.derivedFrom,template=origin&&graph.templates?.find(t=>t.id===origin.templateID&&t.version===origin.version);
+  panel.insertAdjacentHTML('afterbegin',`<section class="design-policy"><label class="field"><span>変更方針</span><select id="design-policy" ${locked?'disabled':''}>${['mutable','immutable','template'].map(v=>`<option ${v===(item.policy||'mutable')?'selected':''}>${v}</option>`).join('')}</select></label>${locked?'<button class="small wide-button" id="unlock-design">保護を解除…</button><small class="protection-scope">設計を保護します。参照先リポジトリの書込権限は変更しません。</small>':''}${field('設計指示 / variantでの差異','design-instructions',item.designInstructions||'',{textarea:true})}${origin?`<p class="template-origin">↳ ${esc(template?.name||origin.templateID)} · v${origin.version}<br><small>${esc(origin.memberID)}</small></p><details><summary>原型の設計指示</summary><p>${esc(template?.instructions||'')}</p></details>`:''}<button class="small wide-button" id="capture-template">${item.policy==='template'?'この原型からvariantを作成':'構成を原型に登録…'}</button></section>`);
+  $('#design-instructions').disabled=locked;
+  bindText('design-instructions',()=>item.designInstructions||'',value=>{item.designInstructions=value;if(kind==='node')invalidateEdges(item.id);else invalidateEdges(null,item.id);});
+  $('#design-policy').onchange=event=>mutate(()=>{item.policy=event.target.value;if(kind==='node')invalidateEdges(item.id);else invalidateEdges(null,item.id);});
+  $('#capture-template').onclick=()=>captureTemplateDialog(kind==='node'?[item.id]:[item.source,item.target],item.policy==='template');
+  if($('#unlock-design'))$('#unlock-design').onclick=safe(async()=>{
+    const selection=clone(selected);
+    if(root){if(dirty&&!await save(true))return;const state=await call('unlock',{kind,id:item.id,revision});if(!state)return;cleanState(state);selected=selection;render();}
+    else if(await confirmChoice('この要素の保護を解除しますか？')){item.policy='mutable';undoStack=[];redoStack=[];markDirty();render();}
+  });
+}
+function captureTemplateDialog(ids,instantiate=false){
+  modal(`<h2>${instantiate?'原型からvariantを作成':'構成を原型に登録'}</h2>${field('原型名','template-name',graph.nodes.find(n=>n.id===ids[0])?.name||'Prototype')}${field('引き継ぐ構成・役割・許容する差異','template-instructions','',{textarea:true})}<div class="modal-actions"><button>キャンセル</button><button type="button" class="primary" id="save-template">${instantiate?'登録してvariantを作成':'登録'}</button></div>`);
+  $('#save-template').onclick=()=>{
+    const name=$('#template-name').value.trim();if(!name)return;
+    const template=design.capture(graph,ids,{id:uid('template'),name,instructions:$('#template-instructions').value});
+    const added=mutate(()=>{(graph.templates??=[]).push(template);});
+    $('#modal').close();if(added&&instantiate)instantiateTemplate(template);
+  };
+}
+function instantiateTemplate(template){
+  const r=$('#canvas').getBoundingClientRect(),p=canvasPoint(r.left+r.width/2,r.top+r.height/2);
+  const minX=Math.min(...template.nodes.map(n=>n.x)),minY=Math.min(...template.nodes.map(n=>n.y));
+  const variant=design.instantiate(template,uid,{x:p.x-minX,y:p.y-minY});
+  mutate(()=>{graph.nodes.push(...variant.nodes);graph.edges.push(...variant.edges);setNodeSelection(variant.nodes.map(n=>n.id));});
+}
+function templateLibrary(){
+  const templates=graph.templates||[];
+  modal(`<h2>原型 / variants</h2>${templates.length?templates.map((t,i)=>`<div class="template-card"><strong>${esc(t.name)} · v${t.version}</strong><p>${t.nodes.length} nodes · ${t.edges.length} edges</p><p>${esc(t.instructions)}</p><button type="button" data-instantiate="${i}">この構成からvariantを作成</button></div>`).join(''):'<p>ノードを選択し、インスペクタから構成を原型に登録できます。</p>'}<div class="modal-actions"><button>閉じる</button></div>`);
+  $$('[data-instantiate]').forEach(b=>b.onclick=()=>{$('#modal').close();instantiateTemplate(templates[Number(b.dataset.instantiate)]);});
+}
+const changeNames={added:'追加',modified:'変更',removed:'削除'};
+function changeList(changes){
+  const relevant=(c,side)=>c.change==='modified'?Object.fromEntries((c.fields||[]).map(key=>[key,c[side]?.[key]??null])):c[side];
+  return changes.map((c,i)=>`<details class="change-record ${esc(c.change)}"><summary><span>${changeNames[c.change]||esc(c.change)}</span> ${esc(c.name||c.id)} <small>${esc(c.kind)} · ${esc(c.fields?.join(', ')||'')}</small></summary><div class="change-columns"><div><strong>変更前</strong><pre>${esc(JSON.stringify(relevant(c,'before'),null,2))}</pre></div><div><strong>変更後</strong><pre>${esc(JSON.stringify(relevant(c,'after'),null,2))}</pre></div></div></details>`).join('')||'<p class="subtle">設計の差分なし</p>';
+}
+async function showHistory(){
+  if(!root){toast('保存するとGit履歴の記録が始まります。');return;}
+  modal(`<h2>変更履歴</h2>${historyState.protectedFiles?.length?`<p class="protection-warning">保護された実装への外部変更 · 未採用</p><pre>${esc(historyState.protectedFiles.join('\n'))}</pre>`:''}<p class="subtle">緑：追加 · 橙：変更 · 紫：実装変更</p><select id="history-commit">${(historyState.commits||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.id.slice(0,7)+' · '+c.date+' · '+c.actor+' · '+c.message)}</option>`).join('')}</select><div id="history-detail"></div><div class="modal-actions"><button type="button" id="clear-change-overlay">差分の強調を解除</button><button>閉じる</button></div>`);
+  $('#modal').classList.add('history-modal');$('#modal').addEventListener('close',()=>$('#modal').classList.remove('history-modal'),{once:true});
+  const load=safe(async()=>{
+    const id=$('#history-commit')?.value;if(!id)return;
+    const detail=await call('historyDetail',{id});if($('#history-commit')?.value!==id)return;
+    changeOverlay=detail.changes;overlayFiles=detail.files;applyChangeOverlay();
+    $('#history-detail').innerHTML=changeList(detail.changes)+`<details class="report-checks"><summary>変更ファイル (${detail.files.length}) / Git diff</summary><pre>${esc(detail.files.join('\n'))}</pre><pre>${esc(detail.diff)}</pre></details>`;
+  });
+  $('#history-commit').onchange=load;$('#clear-change-overlay').onclick=()=>{changeOverlay=[];overlayFiles=[];applyChangeOverlay();$('#modal').close();};await load();
+}
+function reviewExternal(){
+  if(!pendingExternal)return;
+  changeOverlay=pendingExternal.changes||[];overlayFiles=[];applyChangeOverlay();
+  modal(`<h2>外部からの設計変更</h2>${pendingExternal.violations?.length?`<p class="protection-warning">未採用 · ${esc(pendingExternal.violations.join(', '))}</p>`:''}${pendingExternal.error?`<p>${esc(pendingExternal.error)}</p>`:''}${changeList(pendingExternal.changes||[])}<div class="modal-actions"><button>閉じる</button></div>`);
+  $('#modal').classList.add('history-modal');$('#modal').addEventListener('close',()=>$('#modal').classList.remove('history-modal'),{once:true});
+}
+$('#template-library').onclick=templateLibrary;
+$('#show-history').onclick=safe(showHistory);
+$('#review-external').onclick=reviewExternal;
+$('#reject-external').onclick=safe(async()=>{
+  if(!pendingExternal||!await confirmChoice('外部のgraph.jsonを退避し、最後に採用した設計へ戻します。'))return;
+  const draft=dirty?clone(graph):null;
+  const state=await call('rejectExternal',{diskRevision:pendingExternal.diskRevision});cleanState(state);
+  if(draft){graph=draft;markDirty();render();}
+});

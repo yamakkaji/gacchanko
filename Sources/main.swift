@@ -9,7 +9,7 @@ if CommandLine.arguments.contains("--self-test") {
     do { try runSelfTests(); exit(0) } catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
 }
 if let location = argument("--refresh") {
-    do { let store = ProjectStore(); _ = try store.open(URL(fileURLWithPath: location)); try store.exportBrief(); print("Refreshed \(location)"); exit(0) }
+    do { let store = ProjectStore(); let state = try store.open(URL(fileURLWithPath: location)); guard state["pendingExternal"] == nil else { throw PatchError("外部の設計変更が保護または形式の検査で拒否されました。GUIで差分を確認してください。") }; try store.exportBrief(); print("Refreshed \(location)"); exit(0) }
     catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
 }
 
@@ -119,6 +119,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 let result = try store.save(graph, expectedRevision: args["revision"] as? String ?? "")
                 dirty = false; reply(id, value: result)
             case "poll": reply(id, value: try store.poll())
+            case "historyDetail":
+                guard let history = store.history else { throw PatchError("先に保存してください。") }
+                reply(id, value: try history.detail(args["id"] as? String ?? ""))
+            case "unlock":
+                let alert = NSAlert(); alert.messageText = "設計の保護を解除しますか？"; alert.informativeText = "解除は履歴に記録され、この要素を編集できるようになります。"; alert.addButton(withTitle: "解除"); alert.addButton(withTitle: "キャンセル")
+                if alert.runModal() == .alertFirstButtonReturn {
+                    reply(id, value: try store.unlock(kind: args["kind"] as? String ?? "", id: args["id"] as? String ?? "", expectedRevision: args["revision"] as? String ?? ""))
+                } else { reply(id) }
+            case "rejectExternal": reply(id, value: try store.rejectExternal(diskRevision: args["diskRevision"] as? String ?? ""))
             case "reload":
                 guard let root = store.root else { throw PatchError("プロジェクトを開いてください。") }
                 let result = try store.open(root); try store.exportBrief(); dirty = false; reply(id, value: result)

@@ -7,3 +7,6 @@ tests/*-result.txt
 tests/ui-project-*.gacchanko/
 
 __pycache__/
+
+# Runtime history belongs to each integration project, not the app source repo.
+**/.gacchanko/

@@ -1,0 +1,64 @@
+const {JSDOM}=require('jsdom');
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const base=path.resolve(__dirname,'..'),copy=x=>JSON.parse(JSON.stringify(x));
+const dom=new JSDOM(fs.readFileSync(path.join(base,'web/index.html'),'utf8'),{url:'https://gacchanko.local/',runScripts:'outside-only',pretendToBeVisual:true});
+const w=dom.window;
+w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};
+w.HTMLElement.prototype.getBoundingClientRect=function(){return {left:0,top:0,right:900,bottom:700,width:900,height:700};};
+const n=(id,x)=>({id,name:id,path:'',kind:'note',description:'Role '+id,command:'',inputs:['in'],outputs:['out'],x,y:0,policy:'mutable',designInstructions:''});
+let stored={schemaVersion:1,name:'Versioned project',description:'',nodes:[n('source',0),n('target',350)],edges:[{id:'wire',source:'source',target:'target',sourcePort:'out',targetPort:'in',label:'Convert',intent:'Convert the format',mode:'data',policy:'mutable'}]};
+let revision=0,pending=null,reloads=0;
+const change={kind:'node',id:'source',name:'source',change:'modified',fields:['description'],before:copy(stored.nodes[0]),after:{...stored.nodes[0],description:'Agent design'}};
+const history={head:'a'.repeat(40),commits:[{id:'a'.repeat(40),date:'2026-10-07',actor:'external / unknown',message:'Design update'}],changes:[change],files:[]};
+const state=()=>({project:copy(stored),root:'/tmp/design-ui.gacchanko',revision:String(revision),reports:{},history:copy(history)});
+w.gacchankoPlatform={kind:'test',async request(command,args){
+ if(command==='state')return state();if(command==='dirty')return true;
+ if(command==='save'){stored=copy(args.graph);revision++;return state();}
+ if(command==='unlock'){stored[args.kind==='node'?'nodes':'edges'].find(v=>v.id===args.id).policy='mutable';revision++;return state();}
+ if(command==='poll')return pending||state();
+ if(command==='reload'){reloads++;return state();}
+ if(command==='historyDetail')return {id:history.head,changes:[change],files:['graph.json'],diff:'+ Agent design'};
+ throw Error(command);
+},on(){return ()=>{};}};
+for(const name of ['bridge.js','appearance.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(base,'web',name),'utf8'));
+let count=0;
+const check=(condition,name)=>{assert(condition,name);count++;console.log('PASS '+name);};
+const input=(selector,value)=>{const e=w.document.querySelector(selector);e.value=value;e.dispatchEvent(new w.Event('change',{bubbles:true}));};
+const settle=()=>new Promise(r=>setTimeout(r,10));
+(async()=>{try{
+ await w.gacchankoReady;const api=w.gacchanko,D=w.gacchankoDesign,$=s=>w.document.querySelector(s);
+ check($('.node[data-node="source"]').dataset.change==='modified','committed external change is marked on canvas');
+ api.select('node','source');input('#design-policy','immutable');
+ check($('#node-description').disabled&&$('#design-instructions').disabled&&$('#design-policy').disabled,'immutable definition controls are disabled');
+ const original=copy(api.graph);
+ api.mutate(()=>{api.graph.nodes[0].policy='mutable';api.graph.nodes[0].description='bypass';});
+ check(api.graph.nodes[0].policy==='immutable'&&api.graph.nodes[0].description===original.nodes[0].description,'mutation cannot bypass protection by changing incoming policy');
+ api.select('edge','wire');check(!$('.edge-endpoint'),'protected node wiring has no reconnection handles');
+ const beforeDelete=api.graph.edges.length;$('#delete-selected').click();await settle();
+ check(api.graph.edges.length===beforeDelete,'deleting a connection of a protected node is rejected');
+ await api.save();api.select('node','source');$('#unlock-design').click();await settle();
+ check(api.graph.nodes[0].policy==='mutable'&&!$('#node-description').disabled,'explicit native unlock updates editable controls');
+ $('#capture-template').click();input('#template-name','One-stage prototype');input('#template-instructions','Keep the input and output contract');$('#save-template').click();
+ check(api.graph.templates.length===1&&api.graph.templates[0].instructions==='Keep the input and output contract','template instructions are stored in graph JSON');
+ const t=D.capture(api.graph,['source','target'],{id:'pipeline',name:'Pipeline',instructions:'Reuse the source → target structure'});
+ let counter=0;const variant=D.instantiate(t,prefix=>prefix+'_'+(++counter));
+ check(variant.nodes.length===2&&variant.edges.length===1&&variant.edges[0].source===variant.nodes[0].id&&variant.edges[0].target===variant.nodes[1].id,'variant duplicates complete internal topology with remapped IDs');
+ check(variant.nodes[0].derivedFrom.templateID==='pipeline'&&variant.edges[0].derivedFrom.memberID==='wire'&&variant.nodes[0].policy==='mutable','variant pins prototype version and per-member provenance');
+ api.mutate(()=>api.graph.templates.push(t));$('#template-library').click();
+ check($('[data-instantiate="1"]'),'prototype library lists registered subgraphs');
+ $('[data-instantiate="1"]').click();check(api.graph.nodes.length===4&&api.graph.edges.length===2,'library creates an editable subgraph variant');
+ const beforeTemplateEdit=api.graph.templates[1].instructions;api.mutate(()=>api.graph.templates[1].instructions='replace original');
+ check(api.graph.templates[1].instructions===beforeTemplateEdit,'registered prototype version cannot be overwritten');
+ await api.save();$('#show-history').click();await settle();
+ check($('.change-columns')&&$('#history-detail').textContent.includes('Agent design'),'history exposes before and after and real file diff');$('#modal').close();
+ pending={externalChange:true,diskRevision:'new',violations:['node:source'],changes:[change]};await api.poll();
+ check(reloads===0&&!$('#external-banner').hidden&&$('#reload-project').disabled,'protected external edit stays pending and is never automatically reloaded');
+ $('#review-external').click();check($('.protection-warning')&&$('.change-columns'),'pending protection violation is inspectable');$('#modal').close();
+ pending=null;await api.poll();check($('#external-banner').hidden,'externally reverted graph clears stale conflict banner');
+ pending={externalChange:true,diskRevision:'next',violations:[],changes:[change]};$('#canvas').focus();await api.poll();
+ check(reloads===1,'valid external design is reloaded when there is no local draft');
+ const removed=D.changes(copy(stored),{...copy(stored),nodes:stored.nodes.slice(1)});
+ check(removed.some(c=>c.kind==='node'&&c.change==='removed'&&c.before),'deleted nodes retain their before state in diff');
+ console.log(count+' design/UI checks passed');
+ }finally{dom.window.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,0 +1,280 @@
+{
+  "schemaVersion": 1,
+  "name": "Prototype and variant",
+  "description": "上段は保護された原型、下段は同じ構成を引き継ぐvariant。参照先・実装は未設定の設計例。",
+  "nodes": [
+    {
+      "id": "prototype_capture",
+      "name": "Prototype / Observation",
+      "path": "",
+      "kind": "note",
+      "description": "環境から観測を取得する。",
+      "command": "",
+      "inputs": [
+        "in"
+      ],
+      "outputs": [
+        "out"
+      ],
+      "x": 0,
+      "y": 0,
+      "policy": "template",
+      "designInstructions": "役割とポートの契約を維持する。"
+    },
+    {
+      "id": "prototype_decide",
+      "name": "Prototype / Policy",
+      "path": "",
+      "kind": "note",
+      "description": "観測に基づいて行動を選ぶ。",
+      "command": "",
+      "inputs": [
+        "in"
+      ],
+      "outputs": [
+        "out"
+      ],
+      "x": 320,
+      "y": 0,
+      "policy": "template",
+      "designInstructions": "役割とポートの契約を維持する。"
+    },
+    {
+      "id": "prototype_act",
+      "name": "Prototype / Actuator",
+      "path": "",
+      "kind": "note",
+      "description": "選択した行動を環境へ適用する。",
+      "command": "",
+      "inputs": [
+        "in"
+      ],
+      "outputs": [
+        "out"
+      ],
+      "x": 640,
+      "y": 0,
+      "policy": "template",
+      "designInstructions": "役割とポートの契約を維持する。"
+    },
+    {
+      "id": "variant_capture",
+      "name": "Variant / Observation",
+      "path": "",
+      "kind": "note",
+      "description": "環境から観測を取得する。",
+      "command": "",
+      "inputs": [
+        "in"
+      ],
+      "outputs": [
+        "out"
+      ],
+      "x": 0,
+      "y": 280,
+      "policy": "mutable",
+      "designInstructions": "役割とポートの契約を維持する。",
+      "derivedFrom": {
+        "templateID": "observe_decide_act",
+        "version": 1,
+        "memberID": "capture"
+      }
+    },
+    {
+      "id": "variant_decide",
+      "name": "Variant / Policy",
+      "path": "",
+      "kind": "note",
+      "description": "観測に基づいて行動を選ぶ。",
+      "command": "",
+      "inputs": [
+        "in"
+      ],
+      "outputs": [
+        "out"
+      ],
+      "x": 320,
+      "y": 280,
+      "policy": "mutable",
+      "designInstructions": "役割とポートの契約を維持する。",
+      "derivedFrom": {
+        "templateID": "observe_decide_act",
+        "version": 1,
+        "memberID": "decide"
+      }
+    },
+    {
+      "id": "variant_act",
+      "name": "Variant / Actuator",
+      "path": "",
+      "kind": "note",
+      "description": "選択した行動を環境へ適用する。",
+      "command": "",
+      "inputs": [
+        "in"
+      ],
+      "outputs": [
+        "out"
+      ],
+      "x": 640,
+      "y": 280,
+      "policy": "mutable",
+      "designInstructions": "役割とポートの契約を維持する。",
+      "derivedFrom": {
+        "templateID": "observe_decide_act",
+        "version": 1,
+        "memberID": "act"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "prototype_observation",
+      "source": "prototype_capture",
+      "target": "prototype_decide",
+      "sourcePort": "out",
+      "targetPort": "in",
+      "label": "Observation",
+      "intent": "観測形式を判断側の入力に変換する。",
+      "mode": "data",
+      "policy": "template",
+      "designInstructions": "上流から下流へデータを渡す。"
+    },
+    {
+      "id": "prototype_action",
+      "source": "prototype_decide",
+      "target": "prototype_act",
+      "sourcePort": "out",
+      "targetPort": "in",
+      "label": "Action",
+      "intent": "行動の表現を操作側の入力に変換する。",
+      "mode": "data",
+      "policy": "template",
+      "designInstructions": "上流から下流へデータを渡す。"
+    },
+    {
+      "id": "variant_observation",
+      "source": "variant_capture",
+      "target": "variant_decide",
+      "sourcePort": "out",
+      "targetPort": "in",
+      "label": "Observation",
+      "intent": "観測形式を判断側の入力に変換する。",
+      "mode": "data",
+      "policy": "mutable",
+      "designInstructions": "上流から下流へデータを渡す。",
+      "derivedFrom": {
+        "templateID": "observe_decide_act",
+        "version": 1,
+        "memberID": "observation"
+      }
+    },
+    {
+      "id": "variant_action",
+      "source": "variant_decide",
+      "target": "variant_act",
+      "sourcePort": "out",
+      "targetPort": "in",
+      "label": "Action",
+      "intent": "行動の表現を操作側の入力に変換する。",
+      "mode": "data",
+      "policy": "mutable",
+      "designInstructions": "上流から下流へデータを渡す。",
+      "derivedFrom": {
+        "templateID": "observe_decide_act",
+        "version": 1,
+        "memberID": "action"
+      }
+    }
+  ],
+  "templates": [
+    {
+      "id": "observe_decide_act",
+      "version": 1,
+      "name": "Observe → decide → act",
+      "instructions": "観測・判断・操作の3つの役割と内部接続を原型とする。variantでは対象環境や判断モデルを変更してよい。役割の統合や接続の変更が必要なら、designInstructionsに理由を書く。",
+      "nodes": [
+        {
+          "id": "capture",
+          "name": "Observation",
+          "path": "",
+          "kind": "note",
+          "description": "環境から観測を取得する。",
+          "command": "",
+          "inputs": [
+            "in"
+          ],
+          "outputs": [
+            "out"
+          ],
+          "x": 0,
+          "y": 0,
+          "policy": "mutable",
+          "designInstructions": "役割とポートの契約を維持する。"
+        },
+        {
+          "id": "decide",
+          "name": "Policy",
+          "path": "",
+          "kind": "note",
+          "description": "観測に基づいて行動を選ぶ。",
+          "command": "",
+          "inputs": [
+            "in"
+          ],
+          "outputs": [
+            "out"
+          ],
+          "x": 320,
+          "y": 0,
+          "policy": "mutable",
+          "designInstructions": "役割とポートの契約を維持する。"
+        },
+        {
+          "id": "act",
+          "name": "Actuator",
+          "path": "",
+          "kind": "note",
+          "description": "選択した行動を環境へ適用する。",
+          "command": "",
+          "inputs": [
+            "in"
+          ],
+          "outputs": [
+            "out"
+          ],
+          "x": 640,
+          "y": 0,
+          "policy": "mutable",
+          "designInstructions": "役割とポートの契約を維持する。"
+        }
+      ],
+      "edges": [
+        {
+          "id": "observation",
+          "source": "capture",
+          "target": "decide",
+          "sourcePort": "out",
+          "targetPort": "in",
+          "label": "Observation",
+          "intent": "観測形式を判断側の入力に変換する。",
+          "mode": "data",
+          "policy": "mutable",
+          "designInstructions": "上流から下流へデータを渡す。"
+        },
+        {
+          "id": "action",
+          "source": "decide",
+          "target": "act",
+          "sourcePort": "out",
+          "targetPort": "in",
+          "label": "Action",
+          "intent": "行動の表現を操作側の入力に変換する。",
+          "mode": "data",
+          "policy": "mutable",
+          "designInstructions": "上流から下流へデータを渡す。"
+        }
+      ]
+    }
+  ]
+}

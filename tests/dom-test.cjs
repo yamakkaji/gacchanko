@@ -31,6 +31,7 @@ w.webkit={messageHandlers:{gacchanko:{postMessage:async({id,command,args})=>{
 }}}};
 w.eval(fs.readFileSync(path.join(base,'web/bridge.js'),'utf8'));
 w.eval(fs.readFileSync(path.join(base,'web/appearance.js'),'utf8'));
+w.eval(fs.readFileSync(path.join(base,'web/design.js'),'utf8'));
 w.eval(fs.readFileSync(path.join(base,'web/app.js'),'utf8'));
 w.eval(fs.readFileSync(path.join(base,'tests/ui-smoke.js'),'utf8'));
 const timeout=setTimeout(()=>{console.error('DOM tests timed out');dom.window.close();process.exit(1);},20000);

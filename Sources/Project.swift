@@ -2,6 +2,11 @@ import Foundation
 import CryptoKit
 import Darwin
 
+struct TemplateOrigin: Codable {
+    var templateID: String
+    var version: Int
+    var memberID: String
+}
 struct PatchNode: Codable {
     var id: String
     var name: String
@@ -13,6 +18,9 @@ struct PatchNode: Codable {
     var outputs: [String]
     var x: Double
     var y: Double
+    var policy: String? = nil
+    var designInstructions: String? = nil
+    var derivedFrom: TemplateOrigin? = nil
 }
 struct PatchEdge: Codable {
     var id: String
@@ -23,6 +31,17 @@ struct PatchEdge: Codable {
     var label: String
     var intent: String
     var mode: String
+    var policy: String? = nil
+    var designInstructions: String? = nil
+    var derivedFrom: TemplateOrigin? = nil
+}
+struct GraphTemplate: Codable {
+    var id: String
+    var version: Int
+    var name: String
+    var instructions: String
+    var nodes: [PatchNode]
+    var edges: [PatchEdge]
 }
 struct PatchGraph: Codable {
     var schemaVersion: Int
@@ -30,6 +49,7 @@ struct PatchGraph: Codable {
     var description: String
     var nodes: [PatchNode]
     var edges: [PatchEdge]
+    var templates: [GraphTemplate]? = nil
 }
 struct PatchError: LocalizedError {
     let message: String
@@ -58,6 +78,7 @@ func canonicalPath(_ url: URL) -> String {
     return resolved + (suffix.isEmpty ? "" : (resolved == "/" ? "" : "/") + suffix.joined(separator: "/"))
 }
 func validate(_ graph: PatchGraph) throws {
+    try validateDesign(graph)
     guard graph.schemaVersion == 1 else { throw PatchError("未対応のグラフ形式です。schemaVersion は 1 にしてください。") }
     guard graph.nodes.count <= 500, graph.edges.count <= 2000 else { throw PatchError("ノード数または接続数が上限を超えています。") }
     let ids = graph.nodes.map(\.id)
@@ -88,14 +109,34 @@ final class ProjectStore {
     var root: URL?
     var revision = ""
     var graph: PatchGraph?
+    var history: ProjectHistory?
 
     func open(_ location: URL) throws -> [String: Any] {
         let directory = location.lastPathComponent == "graph.json" ? location.deletingLastPathComponent() : location
         let data = try Data(contentsOf: directory.appendingPathComponent("graph.json"))
-        guard data.count < 10_000_000 else { throw PatchError("graph.json が大きすぎます。") }
-        let loaded = try JSONDecoder().decode(PatchGraph.self, from: data)
-        try validate(loaded)
-        root = directory.standardizedFileURL; graph = loaded; revision = digest(data)
+        let history = try ProjectHistory(root: directory.standardizedFileURL)
+        let previous = try history.acceptedGraph()
+        let loaded: PatchGraph
+        do {
+            guard data.count < 10_000_000 else { throw PatchError("graph.json が大きすぎます。") }
+            loaded = try JSONDecoder().decode(PatchGraph.self, from: data)
+            try validate(loaded)
+        } catch {
+            guard let previous else { throw error }
+            root = directory.standardizedFileURL; self.history = history; graph = previous; revision = digest(try jsonData(previous))
+            var result = try snapshot(); result["pendingExternal"] = try externalState(data); return result
+        }
+        root = directory.standardizedFileURL; self.history = history
+        if let previous, !(try protectionViolations(previous, loaded)).isEmpty {
+            graph = previous
+            revision = digest(try jsonData(previous))
+            var result = try snapshot()
+            result["pendingExternal"] = try externalState(data)
+            return result
+        }
+        graph = loaded; revision = digest(data)
+        try exportBrief()
+        try history.checkpoint(actor: previous == nil ? "gacchanko / import" : "external / unknown", message: previous == nil ? "Import project" : "External design or implementation update")
         return try snapshot()
     }
     func create(_ location: URL, graph initial: PatchGraph) throws -> [String: Any] {
@@ -104,7 +145,7 @@ final class ProjectStore {
             throw PatchError("空のフォルダ、または新しい名前を選んでください。既存ファイルは上書きしません。")
         }
         try fm.createDirectory(at: location, withIntermediateDirectories: true)
-        root = location.standardizedFileURL; graph = nil; revision = ""
+        root = location.standardizedFileURL; graph = nil; revision = ""; history = try ProjectHistory(root: location.standardizedFileURL)
         return try save(initial, expectedRevision: "")
     }
     func safeURL(_ relative: String) throws -> URL {
@@ -121,17 +162,29 @@ final class ProjectStore {
         try data.write(to: url, options: .atomic)
     }
     func writeText(_ text: String, to relative: String) throws { try write(Data(text.utf8), to: relative) }
-    func save(_ updated: PatchGraph, expectedRevision: String) throws -> [String: Any] {
+    func save(_ updated: PatchGraph, expectedRevision: String, unlocked: Set<String> = []) throws -> [String: Any] {
         try validate(updated)
+        if let graph {
+            let violations = try protectionViolations(graph, updated, unlocked: unlocked)
+            guard violations.isEmpty else { throw PatchError("保護された設計は変更できません。先に明示的に保護を解除してください。\n" + violations.joined(separator: "\n")) }
+        }
+        if let history {
+            let violations = try history.codeViolations(unlocked: unlocked)
+            guard violations.isEmpty else { throw PatchError("保護された実装ファイルに外部変更があります。変更を戻すか、対象エッジを明示的に解除してください。\n" + violations.joined(separator: "\n")) }
+            _ = try history.trackedFiles()
+        }
         let file = try safeURL("graph.json")
         let onDisk = (try? Data(contentsOf: file)).map(digest) ?? ""
         guard onDisk == expectedRevision else { throw PatchError("別のツールがグラフを更新しました。未保存の編集を JSON 書き出しで退避し、再読み込みしてください。") }
         let encoded = try jsonData(updated)
+        guard encoded.count < 10_000_000 else { throw PatchError("graph.json が大きすぎます。") }
+        if unlocked.isEmpty { try history?.checkpoint(actor: "external / unknown", message: "Implementation / report update before design save") }
         // Preflight generated destinations before committing the authoritative graph.
         for name in ["graph.json", "AGENT_BRIEF.md", "graph.mmd"] + updated.edges.map({ "connections/\($0.id)/SPEC.md" }) { _ = try safeURL(name) }
         try write(encoded, to: "graph.json")
         graph = updated; revision = digest(encoded)
         try exportBrief()
+        try history?.checkpoint(actor: "gacchanko / user", message: unlocked.isEmpty ? "Save design" : "Unlock " + unlocked.sorted().joined(separator: ", "), unlocked: unlocked)
         return try snapshot()
     }
     func exportBrief() throws {
@@ -156,13 +209,19 @@ final class ProjectStore {
         - `verified` means you actually ran relevant checks. For incomplete work use `blocked` and explain what is missing. Do not claim runtime integration has passed from a syntax check alone.
         - The GUI reloads reports automatically. Changed requirements mark earlier reports stale. Reports are agent-provided evidence, not independent certification.
         - Do not modify generated AGENT_BRIEF.md, graph.mmd, or connections/*/SPEC.md. To change the design, edit graph.json (schemaVersion 1), preserve IDs, and save atomically. The GUI detects external edits. Deleted edges' implementation files are intentionally retained; only graph.json determines active edges.
+        - Every node and edge has `policy`: omitted or `mutable` permits edits; `immutable` and `template` protect its definition and existing wiring. Layout may move. Do not remove protection yourself or edit history. Ask the user to unlock in the GUI when needed. Existing protected nodes may receive NEW connections through their declared ports, but existing connections cannot be removed or rewired without unlocking their protected endpoints.
+        - A protected edge also freezes `implementations/<edge-id>/` as of the accepted version. Do not create, alter or delete code there without asking the user to unlock the edge. Reports remain writable; shared code is not covered by an individual edge lock. Referenced source repositories are not OS-locked by gacchanko.
+        - `template` means an architectural prototype, not a blank starting point. Read `designInstructions`, the pinned `derivedFrom` reference, and `templates[].instructions`. Reuse its member roles, ports and internal topology when designing a variant. Explain intentional deviations in the variant's designInstructions. These are design constraints, not C++ code generation.
+        - `templates` holds versioned, self-contained subgraphs. Existing versions are append-only. To create a variant, copy its nodes AND internal edges with new IDs, remap endpoints, and set each member's derivedFrom to {templateID, version, memberID}. Use mutable for variant members. Preserve the pinned version; do not silently upgrade it. To revise a prototype, append a new version.
+        - All policy, provenance and designInstructions fields must survive graph edits. External edits are attributed as external / unknown unless an explicit author was recorded elsewhere; the app does not infer Codex versus Claude from file changes.
+        - Project-local graph, generated specifications, implementations and reports are checkpointed to `.gacchanko/history.git`. Referenced repositories are not included. Same-user filesystem writes cannot be sandboxed by this app. Do not bypass protection by editing its history.
         - No program is executed merely by opening this project. Commands stored on nodes are documentation, not auto-run hooks.
 
         ## Nodes
 
         """
         for node in graph.nodes {
-            brief += "\n### \(node.name) [\(node.id)]\n- Kind: \(node.kind)\n- Location: \(node.path.isEmpty ? "Not set" : node.path)\n- Command (not auto-executed): \(node.command)\n- Inputs: \(node.inputs.joined(separator: ", "))\n- Outputs: \(node.outputs.joined(separator: ", "))\n\n\(node.description)\n"
+            brief += "\n### \(node.name) [\(node.id)]\n- Policy: \(node.policy ?? "mutable")\n- Design instructions: \(node.designInstructions ?? "")\n- Template origin: \(try originDescription(node.derivedFrom, graph))\n- Kind: \(node.kind)\n- Location: \(node.path.isEmpty ? "Not set" : node.path)\n- Command (not auto-executed): \(node.command)\n- Inputs: \(node.inputs.joined(separator: ", "))\n- Outputs: \(node.outputs.joined(separator: ", "))\n\n\(node.description)\n"
         }
         brief += "\n## Active connections\n"
         for edge in graph.edges {
@@ -175,6 +234,9 @@ final class ProjectStore {
             Edge ID: \(edge.id)
             Fingerprint: \(hash)
             Mode: \(edge.mode)
+            Policy: \(edge.policy ?? "mutable")
+            Design instructions: \(edge.designInstructions ?? "")
+            Template origin: \(try originDescription(edge.derivedFrom, graph))
             Source: \(source.name) [\(source.id)] / \(edge.sourcePort)
             Source location: \(source.path)
             Target: \(target.name) [\(target.id)] / \(edge.targetPort)
@@ -218,17 +280,21 @@ final class ProjectStore {
                     let claimed = report["status"] as? String ?? "pending"
                     report["status"] = ["implemented", "verified", "blocked"].contains(claimed) ? claimed : "pending"
                     if report["fingerprint"] as? String != hash { report["status"] = "stale" }
+                    if history?.protectedFiles.contains(where: { $0.hasPrefix("implementations/" + edge.id + "/") }) == true {
+                        report["status"] = "blocked"; report["summary"] = "保護された実装への外部変更を検出しました。履歴への採用を停止しています。"
+                    }
                     reports[edge.id] = report
                 } else { reports[edge.id] = ["status": "blocked", "summary": "レポートの JSON を読み取れません。"] }
             }
         }
-        return ["project": try object(graph), "root": root.path, "revision": revision, "reports": reports, "fingerprints": fingerprints]
+        return ["project": try object(graph), "root": root.path, "revision": revision, "reports": reports, "fingerprints": fingerprints, "history": try history?.summary() ?? [:]]
     }
     func poll() throws -> [String: Any] {
         guard let root else { return ["project": NSNull()] }
         let data = try Data(contentsOf: root.appendingPathComponent("graph.json"))
         let diskRevision = digest(data)
-        if diskRevision != revision { return ["externalChange": true, "diskRevision": diskRevision] }
+        if diskRevision != revision { return try externalState(data) }
+        try history?.checkpoint(actor: "external / unknown", message: "Implementation / report update")
         return try snapshot()
     }
     func prompt(edgeID: String?) throws -> String {
@@ -261,4 +327,226 @@ func inspectPath(_ raw: String) throws -> [String: Any] {
         }
     }
     return ["path": url.path, "name": url.lastPathComponent, "kind": fm.fileExists(atPath: directory.appendingPathComponent(".git").path) ? "repository" : "directory", "description": description, "files": Array(names.prefix(40))]
+}
+
+// Design policy is checked against the last accepted version, never against the
+// policy claimed by an incoming external edit. This is an application guard,
+// not a security boundary against another process with the same file access.
+func validateDesign(_ graph: PatchGraph) throws {
+    let templates = graph.templates ?? []
+    guard templates.count <= 200 else { throw PatchError("原型は200版までです。") }
+    var keys = Set<String>()
+    for t in templates {
+        guard validID(t.id), t.version > 0, keys.insert("\(t.id):\(t.version)").inserted,
+              !t.name.isEmpty, t.nodes.count > 0,
+              (t.nodes.allSatisfy { $0.derivedFrom == nil }), (t.edges.allSatisfy { $0.derivedFrom == nil }) else { throw PatchError("原型のID・版・構成を確認してください。原型の中に派生参照は保存しません。") }
+        try validate(PatchGraph(schemaVersion: 1, name: t.name, description: t.instructions, nodes: t.nodes, edges: t.edges))
+    }
+    func member(_ policy: String?, _ origin: TemplateOrigin?, node: Bool) throws {
+        guard ["mutable", "immutable", "template"].contains(policy ?? "mutable") else { throw PatchError("policy は mutable / immutable / template のいずれかです。") }
+        if let origin {
+            guard let t = templates.first(where: { $0.id == origin.templateID && $0.version == origin.version }),
+                  node ? t.nodes.contains(where: { $0.id == origin.memberID }) : t.edges.contains(where: { $0.id == origin.memberID }) else { throw PatchError("原型の版または構成要素が見つかりません。") }
+        }
+    }
+    for n in graph.nodes { try member(n.policy, n.derivedFrom, node: true) }
+    for e in graph.edges { try member(e.policy, e.derivedFrom, node: false) }
+}
+func originDescription(_ origin: TemplateOrigin?, _ graph: PatchGraph) throws -> String {
+    guard let origin else { return "none" }
+    let t = graph.templates?.first { $0.id == origin.templateID && $0.version == origin.version }
+    return "\(origin.templateID) v\(origin.version) / \(origin.memberID). \(t?.instructions ?? "")"
+}
+func protected(_ policy: String?) -> Bool { ["immutable", "template"].contains(policy ?? "mutable") }
+func protectionViolations(_ old: PatchGraph, _ next: PatchGraph, unlocked: Set<String> = []) throws -> [String] {
+    var violations: [String] = []
+    for n in old.nodes where protected(n.policy) && !unlocked.contains("node:" + n.id) {
+        var before = n; before.x = 0; before.y = 0
+        var after = next.nodes.first { $0.id == n.id }; after?.x = 0; after?.y = 0
+        if try after.map({ try jsonData($0) }) != jsonData(before) { violations.append("node:" + n.id) }
+        for edge in old.edges where edge.source == n.id || edge.target == n.id {
+            let other = next.edges.first { $0.id == edge.id }
+            if other?.source != edge.source || other?.target != edge.target || other?.sourcePort != edge.sourcePort || other?.targetPort != edge.targetPort { violations.append("wiring:" + n.id + "/" + edge.id) }
+        }
+    }
+    for edge in old.edges where protected(edge.policy) && !unlocked.contains("edge:" + edge.id) {
+        if try next.edges.first(where: { $0.id == edge.id }).map({ try jsonData($0) }) != jsonData(edge) { violations.append("edge:" + edge.id) }
+    }
+    for t in old.templates ?? [] {
+        if try next.templates?.first(where: { $0.id == t.id && $0.version == t.version }).map({ try jsonData($0) }) != jsonData(t) { violations.append("template:" + t.id + ":" + String(t.version)) }
+    }
+    return violations
+}
+func designChanges(_ old: PatchGraph?, _ new: PatchGraph) throws -> [[String: Any]] {
+    var result: [[String: Any]] = []
+    func compare<T: Encodable>(_ before: [T], _ after: [T], kind: String, key: (T) -> String) throws {
+        let a = Dictionary(uniqueKeysWithValues: try before.map { (key($0), try object($0) as! [String: Any]) })
+        let b = Dictionary(uniqueKeysWithValues: try after.map { (key($0), try object($0) as! [String: Any]) })
+        for id in Set(a.keys).union(b.keys).sorted() {
+            let left = a[id], right = b[id]
+            let fields = Set(left?.keys.map { $0 } ?? []).union(right?.keys.map { $0 } ?? []).sorted().filter {
+                !NSDictionary(dictionary: ["v": left?[$0] ?? NSNull()]).isEqual(to: ["v": right?[$0] ?? NSNull()])
+            }
+            if fields.isEmpty { continue }
+            result.append(["kind": kind, "id": id, "name": right?["name"] ?? right?["label"] ?? left?["name"] ?? left?["label"] ?? id,
+                           "change": left == nil ? "added" : right == nil ? "removed" : "modified",
+                           "fields": fields, "before": left as Any? ?? NSNull(), "after": right as Any? ?? NSNull()])
+        }
+    }
+    try compare(old?.nodes ?? [], new.nodes, kind: "node", key: { $0.id })
+    try compare(old?.edges ?? [], new.edges, kind: "edge", key: { $0.id })
+    try compare(old?.templates ?? [], new.templates ?? [], kind: "template", key: { "\($0.id):\($0.version)" })
+    if old?.name != new.name || old?.description != new.description {
+        result.append(["kind": "project", "id": "project", "name": new.name, "change": "modified", "fields": ["name", "description"],
+                       "before": ["name": old?.name ?? "", "description": old?.description ?? ""], "after": ["name": new.name, "description": new.description]])
+    }
+    return result
+}
+
+final class ProjectHistory {
+    let root: URL
+    let directory: URL
+    var lastManifest = ""
+    var cachedSummary: [String: Any]?
+    var protectedFiles: [String] = []
+    init(root: URL) throws {
+        self.root = URL(fileURLWithPath: canonicalPath(root), isDirectory: true)
+        directory = self.root.appendingPathComponent(".gacchanko/history.git")
+        guard canonicalPath(directory).hasPrefix(canonicalPath(root) + "/") else { throw PatchError("履歴の保存先がプロジェクト外です。") }
+        if !fm.fileExists(atPath: directory.path) {
+            try fm.createDirectory(at: directory.deletingLastPathComponent(), withIntermediateDirectories: true)
+            _ = try git(["init", "--bare", directory.path], repository: false)
+        }
+        guard fm.fileExists(atPath: directory.appendingPathComponent("HEAD").path) else { throw PatchError("プロジェクトのGit履歴を読み込めません。") }
+    }
+    @discardableResult func git(_ args: [String], repository: Bool = true, allowFailure: Bool = false, outputLimit: Int = 2_000_000) throws -> String {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        task.currentDirectoryURL = root
+        task.arguments = ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "core.fsmonitor=false", "-c", "core.quotePath=false"] + (repository ? ["--git-dir=" + directory.path, "--work-tree=" + root.path] : []) + args
+        // Do not inherit repository routing, index overrides, or global filters.
+        var env = ProcessInfo.processInfo.environment.filter { !$0.key.hasPrefix("GIT_") }
+        env["GIT_CONFIG_NOSYSTEM"] = "1"; env["GIT_CONFIG_GLOBAL"] = "/dev/null"; env["GIT_TERMINAL_PROMPT"] = "0"
+        task.environment = env
+        let output = fm.temporaryDirectory.appendingPathComponent("gacchanko-git-" + UUID().uuidString)
+        fm.createFile(atPath: output.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: output)
+        defer { try? handle.close(); try? fm.removeItem(at: output) }
+        task.standardOutput = handle; task.standardError = handle
+        try task.run(); task.waitUntilExit()
+        let reader = try FileHandle(forReadingFrom: output); defer { try? reader.close() }
+        let text = String(data: try reader.read(upToCount: outputLimit) ?? Data(), encoding: .utf8) ?? ""
+        if task.terminationStatus != 0 && !allowFailure { throw PatchError("Git履歴を保存できません。\n" + String(text.prefix(1500))) }
+        return task.terminationStatus == 0 ? text : ""
+    }
+    func head() throws -> String { try git(["rev-parse", "--verify", "HEAD"], allowFailure: true).trimmingCharacters(in: .whitespacesAndNewlines) }
+    func acceptedGraph(_ ref: String = "HEAD") throws -> PatchGraph? {
+        let text = try git(["show", ref + ":graph.json"], allowFailure: true, outputLimit: 12_000_000)
+        if text.isEmpty { return nil }
+        return try JSONDecoder().decode(PatchGraph.self, from: Data(text.utf8))
+    }
+    func trackedFiles() throws -> [String] {
+        var files: [String] = []
+        for name in ["graph.json", "AGENT_BRIEF.md", "graph.mmd", "connections", "implementations", "reports"] {
+            let url = root.appendingPathComponent(name)
+            guard fm.fileExists(atPath: url.path) else { continue }
+            let resourceKeys: [URLResourceKey] = [.isSymbolicLinkKey, .isRegularFileKey, .isDirectoryKey, .fileSizeKey]
+            func inspect(_ file: URL) throws -> Bool {
+                let values = try file.resourceValues(forKeys: Set(resourceKeys))
+                guard values.isSymbolicLink != true else { throw PatchError("履歴対象にシンボリックリンクは使えません: " + file.lastPathComponent) }
+                if values.isRegularFile == true {
+                    guard (values.fileSize ?? 0) <= 20_000_000 else { throw PatchError("履歴対象のファイルが20MBを超えています: " + file.lastPathComponent) }
+                    files.append(String(file.path.dropFirst(root.path.count + 1)))
+                }
+                return values.isDirectory == true
+            }
+            if try inspect(url), let entries = fm.enumerator(at: url, includingPropertiesForKeys: resourceKeys, options: []) {
+                for case let file as URL in entries {
+                    if file.lastPathComponent.hasPrefix(".") || ["__pycache__", "node_modules", "venv"].contains(file.lastPathComponent) { entries.skipDescendants(); continue }
+                    _ = try inspect(file)
+                    guard files.count < 10000 else { throw PatchError("履歴対象は10000ファイルまでです。") }
+                }
+            }
+        }
+        return files.sorted()
+    }
+    func codeViolations(unlocked: Set<String> = []) throws -> [String] {
+        guard let baseline = try acceptedGraph() else { return [] }
+        let scopes = baseline.edges.filter { protected($0.policy) && !unlocked.contains("edge:" + $0.id) }.map { "implementations/" + $0.id + "/" }
+        if scopes.isEmpty { return [] }
+        let baselineFiles = Set(try git(["ls-tree", "-r", "--name-only", "HEAD", "--"] + scopes).split(separator: "\n").map(String.init))
+        let current = try trackedFiles().filter { file in scopes.contains { file.hasPrefix($0) } }
+        let changed = try git(["diff", "--no-ext-diff", "--no-textconv", "--name-only", "HEAD", "--"] + scopes).split(separator: "\n").map(String.init)
+        return Array(Set(changed + current.filter { !baselineFiles.contains($0) })).sorted()
+    }
+    func checkpoint(actor: String, message: String, unlocked: Set<String> = []) throws {
+        let blocked = try codeViolations(unlocked: unlocked)
+        if blocked != protectedFiles { protectedFiles = blocked; cachedSummary = nil }
+        if !blocked.isEmpty { return }
+        let files = try trackedFiles()
+        // Hash actual bytes: equal mtimes or atomic replacements must not hide changes.
+        var manifest = ""
+        for file in files { manifest += file + ":" + digest(try Data(contentsOf: root.appendingPathComponent(file))) + "\n" }
+        let hash = digest(Data(manifest.utf8))
+        if hash == lastManifest { return }
+        _ = try git(["add", "-u"])
+        for i in stride(from: 0, to: files.count, by: 100) { _ = try git(["add", "--"] + Array(files[i..<min(i+100, files.count)])) }
+        if !(try git(["diff", "--cached", "--name-only"])).isEmpty {
+            _ = try git(["-c", "user.name=" + actor, "-c", "user.email=gacchanko@localhost", "commit", "-m", message])
+            cachedSummary = nil
+        }
+        lastManifest = hash
+    }
+    func summary() throws -> [String: Any] {
+        if let cachedSummary { return cachedSummary }
+        let log = try git(["log", "-40", "--format=%H%x09%aI%x09%an%x09%s"], allowFailure: true)
+        let entries: [[String: String]] = log.split(separator: "\n").compactMap { line in
+            let p = line.split(separator: "\t", maxSplits: 3).map(String.init)
+            return p.count == 4 ? ["id": p[0], "date": p[1], "actor": p[2], "message": p[3]] : nil
+        }
+        let changes: [[String: Any]]
+        if let current = try acceptedGraph() { changes = try designChanges(acceptedGraph("HEAD^"), current) } else { changes = [] }
+        let result: [String: Any] = ["commits": entries, "changes": changes, "head": try head(), "files": try changedFiles("HEAD"), "directory": directory.path, "protectedFiles": protectedFiles]
+        cachedSummary = result
+        return result
+    }
+    func changedFiles(_ ref: String) throws -> [String] {
+        try git(["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", ref]).split(separator: "\n").map(String.init)
+    }
+    func detail(_ ref: String) throws -> [String: Any] {
+        guard ref.range(of: "^[0-9a-f]{40}$", options: .regularExpression) != nil,
+              let graph = try acceptedGraph(ref) else { throw PatchError("履歴の版が見つかりません。") }
+        return ["id": ref, "changes": try designChanges(acceptedGraph(ref + "^"), graph), "files": try changedFiles(ref),
+                "diff": try git(["show", "--format=fuller", "--no-ext-diff", "--no-textconv", "--no-renames", "--stat", "--patch", ref, "--", "graph.json", "implementations", "reports"])]
+    }
+}
+
+extension ProjectStore {
+    func externalState(_ data: Data) throws -> [String: Any] {
+        var result: [String: Any] = ["externalChange": true, "diskRevision": digest(data)]
+        do {
+            guard data.count < 10_000_000 else { throw PatchError("graph.json が大きすぎます。") }
+            let next = try JSONDecoder().decode(PatchGraph.self, from: data)
+            try validate(next)
+            result["changes"] = try designChanges(graph, next)
+            result["violations"] = try graph.map { try protectionViolations($0, next) } ?? []
+        } catch { result["error"] = error.localizedDescription; result["violations"] = ["invalid graph"] }
+        return result
+    }
+    func unlock(kind: String, id: String, expectedRevision: String) throws -> [String: Any] {
+        guard var next = graph else { throw PatchError("プロジェクトを開いてください。") }
+        if kind == "node", let index = next.nodes.firstIndex(where: { $0.id == id }) { next.nodes[index].policy = "mutable" }
+        else if kind == "edge", let index = next.edges.firstIndex(where: { $0.id == id }) { next.edges[index].policy = "mutable" }
+        else { throw PatchError("解除対象が見つかりません。") }
+        return try save(next, expectedRevision: expectedRevision, unlocked: [kind + ":" + id])
+    }
+    func rejectExternal(diskRevision: String) throws -> [String: Any] {
+        let url = try safeURL("graph.json"), data = try Data(contentsOf: url)
+        guard digest(data) == diskRevision, let graph else { throw PatchError("外部の変更が進みました。差分を再確認してください。") }
+        try write(data, to: ".gacchanko/rejected/" + UUID().uuidString + ".json")
+        let accepted = try jsonData(graph)
+        try write(accepted, to: "graph.json"); revision = digest(accepted)
+        try exportBrief()
+        return try snapshot()
+    }
 }

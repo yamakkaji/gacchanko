@@ -81,3 +81,15 @@ Tauri の公式リファレンス
 移行には通信アダプターだけでなく、Swift の保存処理の Rust 移植、OS ごとのダイアログとドロップ、終了時の未保存確認、CSP・権限設定、配布用ビルドの検証が必要。現行版を Tauri でラップするだけで完了するとは扱わない。
 
 保存するグラフ形式は維持し、Rust での fingerprint と revision の算出方法も既存の Swift 実装に合わせる。既存レポートの互換性を保証するため、共通のテストデータで比較する。JSON の数値や文字列の正規化が言語間で異なる場合は、明示的な形式更新と移行処理を用意する。
+
+
+## Versioned design bridge
+
+The host snapshot includes `history` (head, commits, per-member changes, changed files, protectedFiles) and optionally `pendingExternal`. The graph keeps optional `policy`, `designInstructions`, `derivedFrom` on nodes/edges, and `templates` at the root. See [design-versioning.md](design-versioning.md).
+
+- `historyDetail {id}` returns parent-to-commit design changes and the Git patch. Only full hexadecimal commit IDs are accepted.
+- `unlock {kind, id, revision}` requires a native user confirmation, then records a dedicated policy change. Normal `save` cannot unlock protected members.
+- `rejectExternal {diskRevision}` archives the candidate JSON and restores the last accepted graph, with optimistic concurrency validation.
+- `poll` returns pending changes and protection violations instead of accepting them. A valid external edit is adopted by `reload` only when the frontend has no local draft.
+
+`web/design.js` contains pure graph diff, protection, subgraph capture and variant operations. The Swift store independently enforces the policy at the persistence boundary. Tauri hosts must reproduce the store checks; disabling a control in the frontend is insufficient.

@@ -40,6 +40,7 @@ interface GacchankoPlatform {
 | `openProject` | `{}` | 読み込んだ ProjectSnapshot。キャンセル時 `null` |
 | `save` | `{graph,revision}` | 現在のリビジョンを検査して保存。ProjectSnapshot を返す |
 | `poll` | `{}` | ProjectSnapshot または `{externalChange:true,diskRevision:string}` |
+| `adoptExternal` | `{diskRevision, selections: ["node:id", "edge:id", "template:id:version", "project:project"]}` | 検証・選択採用した ProjectSnapshot |
 | `reload` | `{}` | ディスクから再読み込みした ProjectSnapshot |
 | `copyPrompt` | `{edgeID?:string}` | 依頼文をコピーし、その文字列を返す |
 | `copy` | `{text:string}` | クリップボードへコピー |

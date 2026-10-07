@@ -29,6 +29,17 @@ struct PatchNode: Codable {
     var designInstructions: String? = nil
     var derivedFrom: TemplateOrigin? = nil
     var appearance: NodeAppearance? = nil
+    var implementationState: String? = nil
+}
+struct EdgeExecution: Codable {
+    var dispatch: String
+    var join: String
+    var after: [String]
+    var maxConcurrency: Int
+    var timeoutMs: Int
+    var bufferSize: Int
+    var overflow: String
+    var onError: String
 }
 struct PatchEdge: Codable {
     var id: String
@@ -42,6 +53,8 @@ struct PatchEdge: Codable {
     var policy: String? = nil
     var designInstructions: String? = nil
     var derivedFrom: TemplateOrigin? = nil
+    var layer: String? = nil
+    var execution: EdgeExecution? = nil
 }
 struct GraphTemplate: Codable {
     var id: String
@@ -93,6 +106,7 @@ func validate(_ graph: PatchGraph) throws {
     guard Set(ids).count == ids.count, ids.allSatisfy(validID) else { throw PatchError("ノードIDが重複しているか、使用できない文字を含んでいます。") }
     guard Set(graph.edges.map(\.id)).count == graph.edges.count, graph.edges.map(\.id).allSatisfy(validID) else { throw PatchError("接続IDが不正です。") }
     for node in graph.nodes {
+        guard ["unspecified", "planned", "existing", "verified"].contains(node.implementationState ?? "unspecified") else { throw PatchError("実装状態が不正です。") }
         if let a = node.appearance {
             guard a.color.range(of: "^#[0-9a-fA-F]{6}$", options: .regularExpression) != nil,
                   a.radius.isFinite, (0...28).contains(a.radius), ["uniform", "alternating"].contains(a.corners),
@@ -105,11 +119,27 @@ func validate(_ graph: PatchGraph) throws {
               (node.inputs + node.outputs).allSatisfy({ !$0.isEmpty && $0.count <= 100 }) else { throw PatchError("ノードの名前、位置、ポート名を確認してください。") }
     }
     for edge in graph.edges {
+        guard ["data", "control", "event"].contains(edge.layer ?? "data") else { throw PatchError("接続レイヤーが不正です。") }
+        if let e = edge.execution {
+            guard ["sync", "async"].contains(e.dispatch), ["all", "any"].contains(e.join),
+                  (1...64).contains(e.maxConcurrency), (e.dispatch != "sync" || e.maxConcurrency == 1), (1...3600000).contains(e.timeoutMs), (1...10000).contains(e.bufferSize),
+                  ["block", "dropOldest", "dropNewest"].contains(e.overflow), ["stop", "continue"].contains(e.onError),
+                  Set(e.after).count == e.after.count, e.after.allSatisfy({ $0 != edge.id }) else { throw PatchError("非同期実行設定を確認してください。") }
+            guard e.after.allSatisfy({ id in graph.edges.contains(where: { $0.id == id }) }) else { throw PatchError("待機先の接続が見つかりません。") }
+        }
         guard let source = graph.nodes.first(where: { $0.id == edge.source }),
               let target = graph.nodes.first(where: { $0.id == edge.target }),
               source.outputs.contains(edge.sourcePort), target.inputs.contains(edge.targetPort),
               ["data", "request", "event"].contains(edge.mode) else { throw PatchError("接続先またはポートが見つかりません。") }
     }
+    var visiting = Set<String>(), done = Set<String>()
+    func visit(_ id: String) throws {
+        if done.contains(id) { return }
+        guard visiting.insert(id).inserted else { throw PatchError("完了待ちの依存関係が循環しています。反復はイベントで表し、停止条件を指定してください。") }
+        for dependency in graph.edges.first(where: { $0.id == id })?.execution?.after ?? [] { try visit(dependency) }
+        visiting.remove(id); done.insert(id)
+    }
+    for edge in graph.edges { try visit(edge.id) }
 }
 func fingerprint(_ edge: PatchEdge, _ graph: PatchGraph) throws -> String {
     var nodes = graph.nodes.filter { $0.id == edge.source || $0.id == edge.target }
@@ -140,7 +170,7 @@ final class ProjectStore {
             var result = try snapshot(); result["pendingExternal"] = try externalState(data); return result
         }
         root = directory.standardizedFileURL; self.history = history
-        if let previous, !(try protectionViolations(previous, loaded)).isEmpty {
+        if let previous, try jsonData(previous) != jsonData(loaded) {
             graph = previous
             revision = digest(try jsonData(previous))
             var result = try snapshot()
@@ -175,7 +205,7 @@ final class ProjectStore {
         try data.write(to: url, options: .atomic)
     }
     func writeText(_ text: String, to relative: String) throws { try write(Data(text.utf8), to: relative) }
-    func save(_ updated: PatchGraph, expectedRevision: String, unlocked: Set<String> = []) throws -> [String: Any] {
+    func save(_ updated: PatchGraph, expectedRevision: String, unlocked: Set<String> = [], checkpointBefore: Bool = true) throws -> [String: Any] {
         try validate(updated)
         if let graph {
             let violations = try protectionViolations(graph, updated, unlocked: unlocked)
@@ -191,7 +221,7 @@ final class ProjectStore {
         guard onDisk == expectedRevision else { throw PatchError("別のツールがグラフを更新しました。未保存の編集を JSON 書き出しで退避し、再読み込みしてください。") }
         let encoded = try jsonData(updated)
         guard encoded.count < 10_000_000 else { throw PatchError("graph.json が大きすぎます。") }
-        if unlocked.isEmpty { try history?.checkpoint(actor: "external / unknown", message: "Implementation / report update before design save") }
+        if unlocked.isEmpty && checkpointBefore { try history?.checkpoint(actor: "external / unknown", message: "Implementation / report update before design save") }
         // Preflight generated destinations before committing the authoritative graph.
         for name in ["graph.json", "AGENT_BRIEF.md", "graph.mmd"] + updated.edges.map({ "connections/\($0.id)/SPEC.md" }) { _ = try safeURL(name) }
         try write(encoded, to: "graph.json")
@@ -228,13 +258,19 @@ final class ProjectStore {
         - `templates` holds versioned, self-contained subgraphs. Existing versions are append-only. To create a variant, copy its nodes AND internal edges with new IDs, remap endpoints, and set each member's derivedFrom to {templateID, version, memberID}. Use mutable for variant members. Preserve the pinned version; do not silently upgrade it. To revise a prototype, append a new version.
         - All policy, provenance and designInstructions fields must survive graph edits. External edits are attributed as external / unknown unless an explicit author was recorded elsewhere; the app does not infer Codex versus Claude from file changes.
         - Project-local graph, generated specifications, implementations and reports are checkpointed to `.gacchanko/history.git`. Referenced repositories are not included. Same-user filesystem writes cannot be sandboxed by this app. Do not bypass protection by editing its history.
+        - External graph edits are proposals. The GUI retains the accepted graph until the user selects changes to adopt; rejected and partially adopted proposals are archived locally. Preserve IDs and explain your changes in designInstructions. Do not overwrite a proposal while it is being reviewed.
+        - implementationState is user-declared: unspecified / planned / existing / verified. It is not automatic evidence of working code. Inspect references and record actual checks.
+        - Edge layer is data (payload), control (start target after source completes), or event (trigger per event). Missing layer means data. execution describes a contract for generated code, not a scheduler running inside gacchanko.
+        - execution.after lists edge completion dependencies within the SAME run_id and iteration_id. join=all waits for all, any for the first; when any wins, late completions must not trigger the same task again. Dependencies must be acyclic. Roots are activated by explicit start, input or event as described in intent.
+        - dispatch=sync awaits completion before the producer proceeds; async queues work and lets the producer proceed. maxConcurrency bounds active invocations per edge; sync uses one. bufferSize bounds pending work; overflow=block applies backpressure, dropOldest/dropNewest drops that pending item. Define cancellation and delivery guarantees in intent. timeoutMs is the task deadline including dependency/queue waits; onError=stop stops the run, continue emits an error result and proceeds. Failed dependencies must be resolved as errors, never waited for indefinitely.
+        - Loops use event edges with explicit iteration IDs, termination and cancellation rules in intent. A graph cycle alone is not a complete loop specification. Never automatically retry side-effecting operations.
         - No program is executed merely by opening this project. Commands stored on nodes are documentation, not auto-run hooks.
 
         ## Nodes
 
         """
         for node in graph.nodes {
-            brief += "\n### \(node.name) [\(node.id)]\n- Policy: \(node.policy ?? "mutable")\n- Design instructions: \(node.designInstructions ?? "")\n- Template origin: \(try originDescription(node.derivedFrom, graph))\n- Kind: \(node.kind)\n- Location: \(node.path.isEmpty ? "Not set" : node.path)\n- Command (not auto-executed): \(node.command)\n- Inputs: \(node.inputs.joined(separator: ", "))\n- Outputs: \(node.outputs.joined(separator: ", "))\n\n\(node.description)\n"
+            brief += "\n### \(node.name) [\(node.id)]\n- Policy: \(node.policy ?? "mutable")\n- Design instructions: \(node.designInstructions ?? "")\n- Template origin: \(try originDescription(node.derivedFrom, graph))\n- Kind: \(node.kind)\n- Implementation state (user-declared): \(node.implementationState ?? "unspecified")\n- Location: \(node.path.isEmpty ? "Not set" : node.path)\n- Command (not auto-executed): \(node.command)\n- Inputs: \(node.inputs.joined(separator: ", "))\n- Outputs: \(node.outputs.joined(separator: ", "))\n\n\(node.description)\n"
         }
         brief += "\n## Active connections\n"
         for edge in graph.edges {
@@ -247,6 +283,8 @@ final class ProjectStore {
             Edge ID: \(edge.id)
             Fingerprint: \(hash)
             Mode: \(edge.mode)
+            Layer: \(edge.layer ?? "data")
+            Execution: \(try edge.execution.map { String(data: try jsonData($0), encoding: .utf8)! } ?? "Unspecified; agree on scheduling before implementation")
             Policy: \(edge.policy ?? "mutable")
             Design instructions: \(edge.designInstructions ?? "")
             Template origin: \(try originDescription(edge.derivedFrom, graph))
@@ -545,6 +583,33 @@ extension ProjectStore {
             result["violations"] = try graph.map { try protectionViolations($0, next) } ?? []
         } catch { result["error"] = error.localizedDescription; result["violations"] = ["invalid graph"] }
         return result
+    }
+    func adoptExternal(diskRevision: String, selections: [String]) throws -> [String: Any] {
+        let data = try Data(contentsOf: safeURL("graph.json"))
+        guard digest(data) == diskRevision, let baseline = graph else { throw PatchError("提案が更新されました。比較を開き直してください。") }
+        guard data.count < 10_000_000 else { throw PatchError("提案が大きすぎます。") }
+        let proposed = try JSONDecoder().decode(PatchGraph.self, from: data)
+        try validate(proposed)
+        let changes = try designChanges(baseline, proposed)
+        let allowed = Set(changes.map { ($0["kind"] as! String) + ":" + ($0["id"] as! String) })
+        let selected = Set(selections)
+        guard !selected.isEmpty, selected.isSubset(of: allowed) else { throw PatchError("採用する変更を選択してください。") }
+        var next = baseline
+        func merge<T>(_ old: [T], _ incoming: [T], _ kind: String, _ key: (T) -> String) -> [T] {
+            let previousKeys = Set(old.map(key))
+            let kept: [T] = old.compactMap { item in
+                selected.contains(kind + ":" + key(item)) ? incoming.first(where: { key($0) == key(item) }) : item
+            }
+            return kept + incoming.filter { !previousKeys.contains(key($0)) && selected.contains(kind + ":" + key($0)) }
+        }
+        next.nodes = merge(baseline.nodes, proposed.nodes, "node", { $0.id })
+        next.edges = merge(baseline.edges, proposed.edges, "edge", { $0.id })
+        if baseline.templates != nil || proposed.templates != nil { next.templates = merge(baseline.templates ?? [], proposed.templates ?? [], "template", { "\($0.id):\($0.version)" }) }
+        if selected.contains("project:project") { next.name = proposed.name; next.description = proposed.description }
+        try validate(next)
+        guard try protectionViolations(baseline, next).isEmpty else { throw PatchError("選択した変更には保護対象が含まれます。解除せずに採用できません。") }
+        try write(data, to: ".gacchanko/proposals/" + UUID().uuidString + ".json")
+        return try save(next, expectedRevision: diskRevision, checkpointBefore: false)
     }
     func unlock(kind: String, id: String, expectedRevision: String) throws -> [String: Any] {
         guard var next = graph else { throw PatchError("プロジェクトを開いてください。") }

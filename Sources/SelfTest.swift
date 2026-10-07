@@ -127,13 +127,51 @@ func runSelfTests() throws {
     try restarted.write(jsonData(edited), to: "graph.json")
     let agentChanges = try restarted.poll()
     try check((agentChanges["changes"] as? [[String: Any]])?.contains(where: { $0["id"] as? String == "n2" && ($0["fields"] as? [String])?.contains("name") == true }) == true, "external redesign exposes per-field before and after")
-    _ = try restarted.open(restarted.root!)
+    let proposalReopen = try restarted.open(restarted.root!)
+    try check(proposalReopen["pendingExternal"] != nil && restarted.graph!.nodes[1].name != "Agent redesign", "valid external proposal remains pending after restart")
+    try rejects("stale proposal selection rejected") { _ = try restarted.adoptExternal(diskRevision: "stale", selections: ["node:n2"]) }
+    _ = try restarted.adoptExternal(diskRevision: digest(try jsonData(edited)), selections: ["node:n2"])
+    try check(restarted.graph!.nodes[1].name == "Agent redesign", "selected proposal is adopted")
     let history = try restarted.history!.summary()
-    try check((history["commits"] as? [[String: String]])?.first?["actor"] == "external / unknown", "external design checkpoint does not invent agent identity")
+    try check((history["commits"] as? [[String: String]])?.first?["actor"] == "gacchanko / user", "proposal adoption records user decision without inventing agent identity")
     try check(try restarted.history!.acceptedGraph(lockedCommit)?.nodes[0].policy == "immutable", "historical graph remains retrievable")
     try rejects("history ref injection rejected") { _ = try restarted.history!.detail("--output=/tmp/unsafe") }
     try restarted.writeText("{broken", to: "graph.json")
     let malformedReader = ProjectStore(); let malformedState = try malformedReader.open(restarted.root!)
     try check(malformedState["pendingExternal"] != nil && malformedReader.graph!.nodes[1].name == "Agent redesign", "malformed external JSON reopens with last accepted design and warning")
+    let workflowStore = ProjectStore()
+    var flow = PatchGraph(schemaVersion: 1, name: "Async flow", description: "Trigger and process", nodes: [node, other], edges: [edge])
+    flow.nodes[0].implementationState = "planned"
+    flow.edges[0].layer = "event"
+    flow.edges[0].execution = EdgeExecution(dispatch: "async", join: "all", after: [], maxConcurrency: 2, timeoutMs: 5000, bufferSize: 8, overflow: "block", onError: "stop")
+    _ = try workflowStore.create(temp.appendingPathComponent("workflow"), graph: flow)
+    let flowReader = ProjectStore(); _ = try flowReader.open(workflowStore.root!)
+    try check(flowReader.graph!.edges[0].execution?.maxConcurrency == 2 && flowReader.graph!.nodes[0].implementationState == "planned", "workflow contracts survive native JSON round trip")
+    let spec = try String(contentsOf: workflowStore.root!.appendingPathComponent("connections/e1/SPEC.md"), encoding: .utf8)
+    try check(spec.contains("Layer: event") && spec.contains("async"), "handoff exports layers and async execution contract")
+    var badFlow = flow; badFlow.edges[0].execution!.after = ["missing"]
+    try rejects("missing execution dependency rejected") { try validate(badFlow) }
+    badFlow = flow; var secondEdge = edge; secondEdge.id = "e2"; secondEdge.execution = flow.edges[0].execution; secondEdge.execution!.after = ["e1"]
+    badFlow.edges.append(secondEdge); badFlow.edges[0].execution!.after = ["e2"]
+    try rejects("cyclic completion waits rejected") { try validate(badFlow) }
+    badFlow = flow; badFlow.edges[0].execution!.bufferSize = 0
+    try rejects("unbounded or empty async queue rejected") { try validate(badFlow) }
+    var proposal = flow; proposal.nodes[0].description = "Accepted role"; proposal.nodes[1].description = "Not selected"
+    try workflowStore.write(jsonData(proposal), to: "graph.json")
+    _ = try workflowStore.adoptExternal(diskRevision: digest(try jsonData(proposal)), selections: ["node:n1"])
+    try check(workflowStore.graph!.nodes[0].description == "Accepted role" && workflowStore.graph!.nodes[1].description == flow.nodes[1].description, "partial adoption preserves unselected definitions")
+    try check(try fm.contentsOfDirectory(atPath: workflowStore.root!.appendingPathComponent(".gacchanko/proposals").path).count == 1, "complete incoming proposal archived on partial adoption")
+    proposal = workflowStore.graph!; proposal.nodes.removeLast(); proposal.edges = []
+    try workflowStore.write(jsonData(proposal), to: "graph.json")
+    try rejects("partial adoption cannot leave dangling connections") { _ = try workflowStore.adoptExternal(diskRevision: digest(try jsonData(proposal)), selections: ["node:n2"]) }
+    try check(try Data(contentsOf: workflowStore.root!.appendingPathComponent("graph.json")) == jsonData(proposal), "rejected partial adoption leaves proposal intact")
+    _ = try workflowStore.rejectExternal(diskRevision: digest(try jsonData(proposal)))
+    var lockedFlow = workflowStore.graph!; lockedFlow.nodes[0].policy = "immutable"
+    _ = try workflowStore.save(lockedFlow, expectedRevision: workflowStore.revision)
+    proposal = lockedFlow; proposal.nodes[0].description = "Bypass lock"; proposal.nodes[1].description = "Safe change"
+    try workflowStore.write(jsonData(proposal), to: "graph.json")
+    try rejects("proposal adoption cannot bypass immutable") { _ = try workflowStore.adoptExternal(diskRevision: digest(try jsonData(proposal)), selections: ["node:n1"]) }
+    _ = try workflowStore.adoptExternal(diskRevision: digest(try jsonData(proposal)), selections: ["node:n2"])
+    try check(workflowStore.graph!.nodes[0].description == lockedFlow.nodes[0].description && workflowStore.graph!.nodes[1].description == "Safe change", "safe subset of a protection-violating proposal can be adopted")
     print("\(count) core checks passed")
 }

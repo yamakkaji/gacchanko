@@ -14,13 +14,14 @@ const state=()=>({project:copy(stored),root:'/tmp/design-ui.gacchanko',revision:
 w.gacchankoPlatform={kind:'test',async request(command,args){
  if(command==='state')return state();if(command==='dirty')return true;
  if(command==='save'){stored=copy(args.graph);revision++;return state();}
+ if(command==='adoptExternal'){assert.equal(args.diskRevision,pending.diskRevision);assert.equal(JSON.stringify(args.selections),'["node:source"]');stored.nodes[0].description='Agent design';pending=null;revision++;return state();}
  if(command==='unlock'){stored[args.kind==='node'?'nodes':'edges'].find(v=>v.id===args.id).policy='mutable';revision++;return state();}
  if(command==='poll')return pending||state();
  if(command==='reload'){reloads++;return state();}
  if(command==='historyDetail')return {id:history.head,changes:[change],files:['graph.json'],diff:'+ Agent design'};
  throw Error(command);
 },on(){return ()=>{};}};
-for(const name of ['bridge.js','appearance.js','node-appearance.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(base,'web',name),'utf8'));
+for(const name of ['bridge.js','appearance.js','node-appearance.js','workflow.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(base,'web',name),'utf8'));
 let count=0;
 const check=(condition,name)=>{assert(condition,name);count++;console.log('PASS '+name);};
 const input=(selector,value)=>{const e=w.document.querySelector(selector);e.value=value;e.dispatchEvent(new w.Event('change',{bubbles:true}));};
@@ -28,6 +29,16 @@ const settle=()=>new Promise(r=>setTimeout(r,10));
 (async()=>{try{
  await w.gacchankoReady;const api=w.gacchanko,D=w.gacchankoDesign,$=s=>w.document.querySelector(s);
  check($('.node[data-node="source"]').dataset.change==='modified','committed external change is marked on canvas');
+ $('#check-design').click();check($('#modal').textContent.includes('構想／既存実装'),'design check identifies unset implementation state');$('#modal').close();
+ check($('.node.design-incomplete'),'design check highlights incomplete nodes');
+ api.select('node','source');input('#node-implementation','planned');check($('.node[data-node="source"] .node-kind').textContent.includes('構想'),'node shows planned implementation status');
+ api.select('edge','wire');input('#edge-layer','event');input('#execution-dispatch','async');input('#execution-maxConcurrency','3');
+ check(api.graph.edges[0].execution.maxConcurrency===3&&api.graph.edges[0].layer==='event','edge stores async concurrency and layer');
+ input('#edge-layer-filter','data');check(!$('.edge-group')&&!$('.edge-endpoint'),'layer filter hides edges and their reconnection handles');input('#edge-layer-filter','all');
+ await api.handoff('wire');check($('#handoff-incomplete'),'handoff presents incomplete-design warning');$('#modal').close();
+ const wf=w.gacchankoWorkflow;
+ check(wf.check(api.graph).some(i=>i.field==='design-instructions'),'async design asks for cancellation and failure intent');
+
  api.select('node','source');input('#design-policy','immutable');
  check($('#node-description').disabled&&$('#design-instructions').disabled&&$('#design-policy').disabled,'immutable definition controls are disabled');
  check(!$('#node-colour').disabled,'immutable node appearance remains editable');
@@ -62,6 +73,11 @@ const settle=()=>new Promise(r=>setTimeout(r,10));
  let counter=0;const variant=D.instantiate(t,prefix=>prefix+'_'+(++counter));
  check(variant.nodes.length===2&&variant.edges.length===1&&variant.edges[0].source===variant.nodes[0].id&&variant.edges[0].target===variant.nodes[1].id,'variant duplicates complete internal topology with remapped IDs');
  check(variant.nodes[0].derivedFrom.templateID==='pipeline'&&variant.edges[0].derivedFrom.memberID==='wire'&&variant.nodes[0].policy==='mutable','variant pins prototype version and per-member provenance');
+ const flow=copy(api.graph);flow.edges.push({...copy(flow.edges[0]),id:'dependent',execution:{...w.gacchankoWorkflow.execution(),after:['wire']}});
+ const asyncTemplate=D.capture(flow,['source','target'],{id:'async-pipeline',name:'Async',instructions:'Wait for predecessor'});
+ const asyncVariant=D.instantiate(asyncTemplate,prefix=>prefix+'_'+(++counter));
+ check(asyncVariant.edges[1].execution.after[0]===asyncVariant.edges[0].id,'variant remaps completion dependencies to new edge IDs');
+
  api.mutate(()=>api.graph.templates.push(t));$('#template-library').click();
  check($('[data-instantiate="1"]'),'prototype library lists registered subgraphs');
  $('[data-instantiate="1"]').click();check(api.graph.nodes.length===4&&api.graph.edges.length===2,'library creates an editable subgraph variant');
@@ -74,7 +90,9 @@ const settle=()=>new Promise(r=>setTimeout(r,10));
  $('#review-external').click();check($('.protection-warning')&&$('.change-columns'),'pending protection violation is inspectable');$('#modal').close();
  pending=null;await api.poll();check($('#external-banner').hidden,'externally reverted graph clears stale conflict banner');
  pending={externalChange:true,diskRevision:'next',violations:[],changes:[change]};$('#canvas').focus();await api.poll();
- check(reloads===1,'valid external design is reloaded when there is no local draft');
+ check(reloads===0&&!$('#external-banner').hidden,'valid external proposal waits for explicit adoption');
+ $('#review-external').click();$('[data-proposal-key]').checked=true;$('#adopt-proposal').click();await settle();
+ check(api.graph.nodes[0].description==='Agent design'&&$('#external-banner').hidden,'selected proposal applied through native bridge');
  const removed=D.changes(copy(stored),{...copy(stored),nodes:stored.nodes.slice(1)});
  check(removed.some(c=>c.kind==='node'&&c.change==='removed'&&c.before),'deleted nodes retain their before state in diff');
  console.log(count+' design/UI checks passed');

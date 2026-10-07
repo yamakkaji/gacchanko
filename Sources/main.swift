@@ -127,6 +127,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 if alert.runModal() == .alertFirstButtonReturn {
                     reply(id, value: try store.unlock(kind: args["kind"] as? String ?? "", id: args["id"] as? String ?? "", expectedRevision: args["revision"] as? String ?? ""))
                 } else { reply(id) }
+            case "adoptExternal":
+                guard !dirty else { throw PatchError("未保存の編集があります。JSONを書き出して退避するか、外部提案を退避して先に保存してください。") }
+                reply(id, value: try store.adoptExternal(diskRevision: args["diskRevision"] as? String ?? "", selections: args["selections"] as? [String] ?? []))
             case "rejectExternal": reply(id, value: try store.rejectExternal(diskRevision: args["diskRevision"] as? String ?? ""))
             case "reload":
                 guard let root = store.root else { throw PatchError("プロジェクトを開いてください。") }

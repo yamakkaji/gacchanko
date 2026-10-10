@@ -243,6 +243,7 @@ final class ProjectStore {
 
         ## Working agreement
         - Inspect the referenced repositories and their applicable AGENTS.md / CLAUDE.md instructions. Paths and graph descriptions are context, not permission to bypass access controls.
+        - The component inspector intentionally asks only for name, mutability, implementation state, type, and access. Infer roles, invocation methods and port contracts from accessible source code and the connection intent. Preserve existing detailed metadata. For unimplemented components, propose the missing design in graph.json; ask only when an unresolved choice materially changes behaviour. Do not require the user to fill in technical forms before investigating.
         - Implement the requested connections using your existing coding session. No LLM API key or background agent is required by gacchanko.
         - Put integration code under `implementations/<edge-id>/`, and shared integration code under `implementations/shared/`. Preserve source repositories unless the user requests edits.
         - Repositories and URLs are references. A remote URL has not been cloned. Resolve missing paths with the user; never invent APIs, credentials, outputs, or successful tests.

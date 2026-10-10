@@ -14,6 +14,7 @@ let checkedDesign=false,edgeLayerFilter="all",connectionDraftID=null;
 let historyState={}, savedGraph=null, pendingExternal=null, changeOverlay=null, overlayFiles=null;
 let edgeAppearance=appearance.load();
 let nodeAppearanceExpanded=false;
+let viewportFrame=0, edgeZoomTimer, renderedEdgeZoom=1;
 const call = (command, args={}) => host.request(command,args);
 const emptyGraph = () => ({schemaVersion:1,name:'Untitled project',description:'',nodes:[],edges:[]});
 let graph=emptyGraph(), root='', revision='', reports={}, fingerprints={}, dirty=false, selected=null;
@@ -104,11 +105,12 @@ function beginDrag(event,state){
   event.preventDefault();
 }
 function renderEdges(){
+  clearTimeout(edgeZoomTimer);renderedEdgeZoom=view.zoom;
   $('#edge-paths').innerHTML=graph.edges.filter(e=>edgeLayerFilter==='all'||(e.layer||'data')===edgeLayerFilter).map((e,index)=>{
     const a=portPoint(e.source,e.sourcePort,'out'),b=portPoint(e.target,e.targetPort,'in');
-    const route=edgeRoute(e.source,e.target,e.id),mid=appearance.geometry(a,b,route).point(.5),x=mid.x,y=mid.y, label=((e.layer||'data')==='control'?'▶ ':e.layer==='event'?'ϟ ':'')+(e.execution?.dispatch==='async'?'⇢ ':'')+(design.locked(e)?(e.policy==='template'?'◇ ':'🔒 '):e.derivedFrom?'↳ ':'')+(e.mode==='request'?'↔ ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
+    const route=edgeRoute(e.source,e.target,e.id),geometry=appearance.geometry(a,b,route),mid=geometry.point(.5),x=mid.x,y=mid.y, label=((e.layer||'data')==='control'?'▶ ':e.layer==='event'?'ϟ ':'')+(e.execution?.dispatch==='async'?'⇢ ':'')+(design.locked(e)?(e.policy==='template'?'◇ ':'🔒 '):e.derivedFrom?'↳ ':'')+(e.mode==='request'?'↔ ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
     const colour={verified:'#416762',implemented:'#715669',stale:'#9a6a23',blocked:'#a54844'}[status(e.id)]||'#486080';
-    return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-layer="${esc(e.layer||'data')}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${curve(a,b,route)}"/>${appearance.render(a,b,{...route,settings:edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
+    return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-layer="${esc(e.layer||'data')}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${geometry.d}"/>${appearance.render(a,b,{...route,geometry,settings:edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
   }).join('')+connectionPreview();
   $$('.edge-group').forEach(el=>{
     el.classList.toggle('reconnecting',connecting?.edgeID===el.dataset.edge);
@@ -154,12 +156,18 @@ function transform(){
   $('#zoom-label').textContent=Math.round(view.zoom*100)+'%';
   $('#canvas').style.backgroundSize=`${22*view.zoom}px ${22*view.zoom}px`;
   $('#canvas').style.backgroundPosition=`${view.x}px ${view.y}px`;
-  renderEdges();
+  // Keep SVG nodes and listeners alive while navigating. Refit screen-sized
+  // decorations only once the zoom gesture settles; panning never rebuilds edges.
+  clearTimeout(edgeZoomTimer);
+  if(renderedEdgeZoom!==view.zoom)edgeZoomTimer=setTimeout(()=>renderEdges(),140);
+}
+function scheduleTransform(){
+  if(!viewportFrame)viewportFrame=requestAnimationFrame(()=>{viewportFrame=0;transform();});
 }
 function canvasPoint(clientX,clientY){const r=$('#canvas').getBoundingClientRect();return{x:(clientX-r.left-view.x)/view.zoom,y:(clientY-r.top-view.y)/view.zoom};}
 function fit(){if(!graph.nodes.length){view={x:65,y:65,zoom:1};transform();return;}const r=$('#canvas').getBoundingClientRect();const edgePoints=graph.edges.flatMap(e=>appearance.geometry(portPoint(e.source,e.sourcePort,'out'),portPoint(e.target,e.targetPort,'in'),edgeRoute(e.source,e.target,e.id)).samples);const minX=Math.min(...graph.nodes.map(n=>n.x),...edgePoints.map(p=>p.x-40)),minY=Math.min(...graph.nodes.map(n=>n.y),...edgePoints.map(p=>p.y-40)),maxX=Math.max(...graph.nodes.map(n=>n.x+224),...edgePoints.map(p=>p.x+40)),maxY=Math.max(...graph.nodes.map(n=>n.y+nodeHeight(n)),...edgePoints.map(p=>p.y+40));
   const zoom=Math.min(1.1,Math.max(.25,Math.min((r.width-100)/(maxX-minX),(r.height-130)/(maxY-minY))));view={zoom,x:(r.width-(maxX-minX)*zoom)/2-minX*zoom,y:(r.height-(maxY-minY)*zoom)/2-minY*zoom-12};transform();}
-function zoomBy(factor,cx,cy){const r=$('#canvas').getBoundingClientRect();const x=cx??r.left+r.width/2,y=cy??r.top+r.height/2;const p=canvasPoint(x,y);view.zoom=Math.max(.2,Math.min(2.5,view.zoom*factor));view.x=x-r.left-p.x*view.zoom;view.y=y-r.top-p.y*view.zoom;transform();}
+function zoomBy(factor,cx,cy,defer=false){const r=$('#canvas').getBoundingClientRect();const x=cx??r.left+r.width/2,y=cy??r.top+r.height/2;const p=canvasPoint(x,y);view.zoom=Math.max(.2,Math.min(2.5,view.zoom*factor));view.x=x-r.left-p.x*view.zoom;view.y=y-r.top-p.y*view.zoom;defer?scheduleTransform():transform();}
 function movingDirection(){return connecting?.moving==='source'?'out':'in';}
 function connectionEndpoints(candidate){
   const c=connecting;
@@ -278,16 +286,20 @@ function renderInspector(force=false){
   const panel=$('#inspector');
   if(selected?.type==='node'){
     const n=graph.nodes.find(n=>n.id===selected.id);if(!n){selected=null;return renderInspector(true);}
-    panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">COMPONENT</span><span class="badge">${esc(n.id)}</span></div><h2>${esc(n.name)}</h2>${field('名前','node-name',n.name)}<label class="field"><span>種類</span><select id="node-kind">${Object.keys(symbols).map(k=>`<option ${k===n.kind?'selected':''}>${k}</option>`).join('')}</select></label>${field('ディレクトリ / リポジトリ URL','node-path',n.path,{})}<button class="wide-button" id="set-node-path">参照先を選び直す…</button>${field('役割・補足','node-description',n.description,{textarea:true})}${field('起動・呼び出し方法（参考）','node-command',n.command,{})}<div class="field-row">${field('入力ポート','node-inputs',n.inputs.join(', '),{hint:'カンマ区切り'})}${field('出力ポート','node-outputs',n.outputs.join(', '),{hint:'カンマ区切り'})}</div><hr><button class="wide-button danger" id="delete-selected">コンポーネントを削除</button>`;
-    for(const prop of ['name','path','description','command'])bindText('node-'+prop,()=>n[prop],value=>{n[prop]=value;invalidateEdges(n.id);},prop==='name');
+    const locked=design.locked(n),implemented=['existing','verified'].includes(n.implementationState);
+    panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">COMPONENT</span></div>${field('Component Name','node-name',n.name)}<label class="field"><span>Mutability</span><select id="design-policy"><option value="mutable" ${!locked?'selected':''}>mutable</option><option value="immutable" ${locked?'selected':''}>immutable</option></select></label><label class="field"><span>Implementation</span><select id="node-implementation"><option value="planned" ${!implemented?'selected':''}>not implemented</option><option value="existing" ${implemented?'selected':''}>implemented</option></select></label><label class="field"><span>Component Type</span><select id="node-kind">${Object.keys(symbols).map(k=>`<option ${k===n.kind?'selected':''}>${k}</option>`).join('')}</select></label>${field('Access','node-path',n.path)}<button class="wide-button" id="set-node-path">Browse…</button><div class="component-actions"><button id="node-appearance-action">外観</button><button id="capture-template">原型に登録</button><button class="danger" id="delete-selected">削除</button></div>`;
+    $('#node-path').placeholder='/path/to/component, https://…, IP address';
+    $('#node-path').spellcheck=false;
+    for(const prop of ['name','path'])bindText('node-'+prop,()=>n[prop],value=>{n[prop]=value;invalidateEdges(n.id);},prop==='name');
     $('#node-kind').onchange=e=>mutate(()=>{n.kind=e.target.value;invalidateEdges(n.id);});
-    for(const prop of ['inputs','outputs'])$('#node-'+prop).onchange=e=>{
-      const ports=[...new Set(e.target.value.split(',').map(s=>s.trim()).filter(Boolean))];
-      if(ports.length>30||ports.some(p=>p.length>100)){toast('ポートは30個まで、名前は100文字以内にしてください。',true);renderInspector(true);return;}
-      const affected=graph.edges.some(edge=>prop==='inputs'?edge.target===n.id&&!ports.includes(edge.targetPort):edge.source===n.id&&!ports.includes(edge.sourcePort));
-      if(affected){toast('接続中のポートは削除・改名できません。先にエッジを削除してください。',true);renderInspector(true);return;}
-      mutate(()=>{n[prop]=ports;invalidateEdges(n.id);});
+    $('#node-implementation').onchange=e=>mutate(()=>{n.implementationState=e.target.value;invalidateEdges(n.id);});
+    $('#design-policy').onchange=event=>{
+      if(locked){event.target.value='immutable';safe(()=>unlockDesign('node',n))();}
+      else mutate(()=>{n.policy=event.target.value;invalidateEdges(n.id);});
     };
+    if(locked)for(const control of $$('#inspector input,#node-kind,#node-implementation,#set-node-path,#delete-selected'))control.disabled=true;
+    $('#capture-template').onclick=()=>captureTemplateDialog([n.id],n.policy==='template');
+    $('#node-appearance-action').onclick=openNodeAppearance;
     $('#set-node-path').onclick=safe(async()=>{const paths=await call('chooseNodes');if(paths.length){const value=await call('inspect',{path:paths[0]});mutate(()=>{n.path=value.path;if(!n.description)n.description=value.description;invalidateEdges(n.id);});}});
   }else if(selected?.type==='nodes'){
     const count=selectedNodeIDs().length;
@@ -307,7 +319,7 @@ function renderInspector(force=false){
   if($('#delete-selected'))$('#delete-selected').onclick=safe(deleteSelected);
   renderWorkflowInspector();
   renderDesignInspector();
-  renderNodeAppearanceInspector();
+  if(selected?.type==='nodes')renderNodeAppearanceInspector();
   showConnectionSetup();
 }
 function appearanceSettings(){
@@ -699,7 +711,7 @@ window.addEventListener('pointercancel',()=>{finishDrag(true);clearConnection();
 $('#canvas').addEventListener('lostpointercapture',()=>{finishDrag(true);if(connecting?.held)clearConnection();});
 window.addEventListener('blur',()=>{spacePressed=false;$('#canvas').classList.remove('pan-ready');finishDrag(true);clearConnection();});
 window.addEventListener('keyup',e=>{if(e.code==='Space'){spacePressed=false;$('#canvas').classList.remove('pan-ready');}});
-$('#canvas').addEventListener('wheel',e=>{e.preventDefault();if(drag||connecting)return;if(e.ctrlKey||e.metaKey)zoomBy(Math.exp(-e.deltaY*.012),e.clientX,e.clientY);else{view.x-=e.deltaX;view.y-=e.deltaY;transform();}},{passive:false});
+$('#canvas').addEventListener('wheel',e=>{e.preventDefault();if(drag||connecting)return;if(e.ctrlKey||e.metaKey)zoomBy(Math.exp(-e.deltaY*.012),e.clientX,e.clientY,true);else{view.x-=e.deltaX;view.y-=e.deltaY;scheduleTransform();}},{passive:false});
 $('#canvas').addEventListener('dragover',e=>{e.preventDefault();$('#canvas').classList.add('drag-over');});
 $('#canvas').addEventListener('dragleave',()=>$('#canvas').classList.remove('drag-over'));
 $('#canvas').addEventListener('drop',safe(async e=>{e.preventDefault();$('#canvas').classList.remove('drag-over');const text=e.dataTransfer.getData('text/uri-list')||e.dataTransfer.getData('text/plain');if(text&&/^https?:\/\//.test(text))await addPaths([text.trim()],canvasPoint(e.clientX,e.clientY));}));
@@ -750,7 +762,7 @@ function renderDesignInspector(){
     $('#inspector').insertAdjacentHTML('beforeend','<button class="wide-button" id="capture-template">選択した構成を原型に登録</button>');
     $('#capture-template').onclick=()=>captureTemplateDialog(selectedNodeIDs());return;
   }
-  if(!['node','edge'].includes(kind))return;
+  if(kind!=='edge')return;
   const item=(kind==='node'?graph.nodes:graph.edges).find(v=>v.id===selected.id);
   if(!item)return;
   const locked=design.locked(item),panel=$('#inspector');
@@ -762,10 +774,13 @@ function renderDesignInspector(){
   $('#design-policy').onchange=event=>mutate(()=>{item.policy=event.target.value;if(kind==='node')invalidateEdges(item.id);else invalidateEdges(null,item.id);});
   $('#capture-template').onclick=()=>captureTemplateDialog(kind==='node'?[item.id]:[item.source,item.target],item.policy==='template');
   if($('#unlock-design'))$('#unlock-design').onclick=safe(async()=>{
-    const selection=clone(selected);
-    if(root){if(dirty&&!await save(true))return;const state=await call('unlock',{kind,id:item.id,revision});if(!state)return;cleanState(state);selected=selection;render();}
-    else if(await confirmChoice('この要素の保護を解除しますか？')){item.policy='mutable';undoStack=[];redoStack=[];markDirty();render();}
+    await unlockDesign(kind,item);
   });
+}
+async function unlockDesign(kind,item){
+  const selection=clone(selected);
+  if(root){if(dirty&&!await save(true))return;const state=await call('unlock',{kind,id:item.id,revision});if(!state)return;cleanState(state);selected=selection;render();}
+  else if(await confirmChoice('この要素の保護を解除しますか？')){item.policy='mutable';undoStack=[];redoStack=[];markDirty();render();}
 }
 function captureTemplateDialog(ids,instantiate=false){
   modal(`<h2>${instantiate?'原型からvariantを作成':'構成を原型に登録'}</h2>${field('原型名','template-name',graph.nodes.find(n=>n.id===ids[0])?.name||'Prototype')}${field('引き継ぐ構成・役割・許容する差異','template-instructions','',{textarea:true})}<div class="modal-actions"><button>キャンセル</button><button type="button" class="primary" id="save-template">${instantiate?'登録してvariantを作成':'登録'}</button></div>`);
@@ -840,12 +855,16 @@ $$('.app-menu').forEach(menu=>menu.addEventListener('toggle',()=>{if(menu.open)$
 document.addEventListener('pointerdown',event=>{if(!event.target.closest('.app-menu'))$$('.app-menu').forEach(menu=>menu.open=false);});
 window.addEventListener('keydown',event=>{if(event.key==='Escape')$$('.app-menu').forEach(menu=>menu.open=false);});
 
-function renderNodeAppearanceInspector(){
+function openNodeAppearance(){
+  modal('<h2>ノードの外観</h2><div id="node-appearance-dialog"></div><div class="modal-actions"><button>閉じる</button></div>');
+  renderNodeAppearanceInspector($('#node-appearance-dialog'));
+}
+function renderNodeAppearanceInspector(container=$('#inspector')){
   const ids=selectedNodeIDs();if(!ids.length)return;
   const items=graph.nodes.filter(n=>ids.includes(n.id)),first=items[0],value=nodeLook.normalize(first.appearance,first.kind);
   const mixed=key=>items.some(n=>nodeLook.normalize(n.appearance,n.kind)[key]!==value[key]);
   const option=(v,label,current)=>`<option value="${v}" ${v===current?'selected':''}>${label}</option>`;
-  $('#inspector').insertAdjacentHTML('afterbegin',`<details class="node-appearance-panel" ${nodeAppearanceExpanded?'open':''}><summary><span class="node-colour-dot" style="background:${value.color}"></span>ノードの外観${items.length>1?` · ${items.length}個`:''}</summary><div class="node-appearance-content"><label class="field"><span>アクセント色${mixed('color')?'（混在）':''}</span><div class="node-colour-inputs"><input type="color" id="node-colour" value="${value.color}" aria-label="ノードのアクセント色"><input id="node-colour-hex" aria-label="アクセント色のHEX値" maxlength="7" value="${value.color}" spellcheck="false"></div></label><div class="node-colour-presets">${nodeLook.presets.map(([name,color])=>`<button type="button" class="node-colour-swatch" data-node-colour="${color}" style="--swatch:${color}" aria-label="${name}" title="${name}"></button>`).join('')}</div><label class="field"><span>カード${mixed('surface')?'（混在）':''}</span><select id="node-surface">${[['filled','ベタ塗り'],['outlined','枠線（Outlined）'],['elevated','影（Elevated）']].map(([v,l])=>option(v,l,value.surface)).join('')}</select></label><label class="field"><span>角の形${mixed('corners')?'（混在）':''}</span><select id="node-corners">${option('uniform','均等',value.corners)}${option('alternating','対角を非対称に',value.corners)}</select></label><label class="field"><span>角の丸み${mixed('radius')?'（混在）':''} <output id="node-radius-value">${value.radius}px</output></span><input id="node-radius" type="range" min="0" max="28" step="1" value="${value.radius}"></label><div class="node-radius-presets">${[0,4,8,12,16,24,28].map(r=>`<button type="button" data-node-radius="${r}">${r}</button>`).join('')}</div><label class="field"><span>タイトルバー${mixed('header')?'（混在）':''}</span><select id="node-header-style">${option('striped','Platinum の縞模様',value.header)}${option('plain','単色',value.header)}</select></label><button type="button" class="wide-button" id="reset-node-appearance">種類ごとの標準に戻す</button></div></details>`);
+  container.insertAdjacentHTML('afterbegin',`<details class="node-appearance-panel" ${container.id==='node-appearance-dialog'||nodeAppearanceExpanded?'open':''}><summary><span class="node-colour-dot" style="background:${value.color}"></span>ノードの外観${items.length>1?` · ${items.length}個`:''}</summary><div class="node-appearance-content"><label class="field"><span>アクセント色${mixed('color')?'（混在）':''}</span><div class="node-colour-inputs"><input type="color" id="node-colour" value="${value.color}" aria-label="ノードのアクセント色"><input id="node-colour-hex" aria-label="アクセント色のHEX値" maxlength="7" value="${value.color}" spellcheck="false"></div></label><div class="node-colour-presets">${nodeLook.presets.map(([name,color])=>`<button type="button" class="node-colour-swatch" data-node-colour="${color}" style="--swatch:${color}" aria-label="${name}" title="${name}"></button>`).join('')}</div><label class="field"><span>カード${mixed('surface')?'（混在）':''}</span><select id="node-surface">${[['filled','ベタ塗り'],['outlined','枠線（Outlined）'],['elevated','影（Elevated）']].map(([v,l])=>option(v,l,value.surface)).join('')}</select></label><label class="field"><span>角の形${mixed('corners')?'（混在）':''}</span><select id="node-corners">${option('uniform','均等',value.corners)}${option('alternating','対角を非対称に',value.corners)}</select></label><label class="field"><span>角の丸み${mixed('radius')?'（混在）':''} <output id="node-radius-value">${value.radius}px</output></span><input id="node-radius" type="range" min="0" max="28" step="1" value="${value.radius}"></label><div class="node-radius-presets">${[0,4,8,12,16,24,28].map(r=>`<button type="button" data-node-radius="${r}">${r}</button>`).join('')}</div><label class="field"><span>タイトルバー${mixed('header')?'（混在）':''}</span><select id="node-header-style">${option('striped','Platinum の縞模様',value.header)}${option('plain','単色',value.header)}</select></label><button type="button" class="wide-button" id="reset-node-appearance">種類ごとの標準に戻す</button></div></details>`);
   $('.node-appearance-panel').ontoggle=event=>{nodeAppearanceExpanded=event.target.open;};
   let checkpoint=false;
   function apply(patch,{reset=false}={}){
@@ -861,7 +880,7 @@ function renderNodeAppearanceInspector(){
   for(const [id,key]of [['node-surface','surface'],['node-corners','corners'],['node-header-style','header']])$('#'+id).onchange=event=>{begin();apply({[key]:event.target.value});};
   $$('[data-node-colour]').forEach(button=>button.onclick=()=>{begin();apply({color:button.dataset.nodeColour});});
   $$('[data-node-radius]').forEach(button=>button.onclick=()=>{begin();apply({radius:Number(button.dataset.nodeRadius)});});
-  $('#reset-node-appearance').onclick=()=>{begin();apply({}, {reset:true});renderInspector(true);};
+  $('#reset-node-appearance').onclick=()=>{begin();apply({}, {reset:true});if(container.id==='node-appearance-dialog')openNodeAppearance();else renderInspector(true);};
 }
 
 function applyCheckHighlights(){
@@ -885,11 +904,6 @@ function showDesignCheck(edgeID,forHandoff=false){
 function renderWorkflowInspector(){
   const panel=$('#inspector');
   const options=(values,current)=>Object.entries(values).map(([v,l])=>`<option value="${v}" ${v===current?'selected':''}>${l}</option>`).join('');
-  if(selected?.type==='node'){
-    const n=graph.nodes.find(n=>n.id===selected.id);
-    panel.insertAdjacentHTML('afterbegin',`<label class="field"><span>実装状態（申告）</span><select id="node-implementation">${options(workflow.states,n.implementationState||'unspecified')}</select><small>参照先の存在だけでは実装済みと判定しません。</small></label>`);
-    $('#node-implementation').onchange=e=>mutate(()=>{n.implementationState=e.target.value;invalidateEdges(n.id);});
-  }
   if(selected?.type!=='edge')return;
   const e=graph.edges.find(e=>e.id===selected.id),ex=e.execution||workflow.execution();
   panel.insertAdjacentHTML('beforeend',`<section class="execution-settings"><h3>レイヤーと実行順序</h3><label class="field"><span>レイヤー</span><select id="edge-layer">${options(workflow.layers,e.layer||'data')}</select></label><label class="field"><span>起動方式</span><select id="execution-dispatch">${options({sync:'同期 · 完了を待つ',async:'非同期 · キューへ送る'},ex.dispatch)}</select></label><label class="field"><span>完了待ち（同じ実行・反復内）</span><select id="execution-after" multiple size="4">${graph.edges.filter(x=>x.id!==e.id).map(x=>`<option value="${esc(x.id)}" ${ex.after.includes(x.id)?'selected':''}>${esc(x.label)} · ${esc(x.id)}</option>`).join('')}</select><small>⌘ / Ctrl で複数選択・解除。未選択なら入力やイベントから開始。</small></label><label class="field"><span>待機条件</span><select id="execution-join">${options({all:'すべて完了',any:'いずれか完了 · 1回だけ起動'},ex.join)}</select></label>${[['maxConcurrency','最大並列数',1,64],['timeoutMs','期限（ms）',1,3600000],['bufferSize','待機キュー上限',1,10000]].map(([key,label,min,max])=>`<label class="field"><span>${label}</span><input id="execution-${key}" type="number" min="${min}" max="${max}" step="1" value="${ex[key]}"></label>`).join('')}<label class="field"><span>キュー満杯時</span><select id="execution-overflow">${options({block:'送信側を待機',dropOldest:'最も古い待機項目を破棄',dropNewest:'新しい項目を破棄'},ex.overflow)}</select></label><label class="field"><span>失敗・期限切れ</span><select id="execution-onError">${options({stop:'実行を停止',continue:'エラー結果を返して継続'},ex.onError)}</select></label><button type="button" id="confirm-execution" class="wide-button">この実行設定を確定</button><small>生成コードへの仕様です。ここでは実行しません。反復・開始条件・キャンセルは設計指示に記述してください。</small></section>`);

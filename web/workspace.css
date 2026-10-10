@@ -63,3 +63,6 @@ footer{height:23px;min-height:23px;box-shadow:none;background:#edeef1e6;border-t
 .check-issue{display:flex;flex-direction:column;white-space:normal;text-align:left;width:100%;gap:4px;margin:7px 0;border-left:3px solid #c83232}.check-issue span{font-size:11px}
 #connection-setup{padding:10px;border:1px solid #9db7d9;border-radius:6px;background:#e6effa;margin-bottom:14px}#connection-setup h3{margin:0}#connection-setup p{font-size:11px}#connection-setup button{font-size:11px;margin:10px 5px 0 0}
 .execution-settings{border-top:1px solid #d8dae0;margin-top:16px;padding-top:8px}.execution-settings small{font-size:10px;color:#555}.proposal-select{display:flex;align-items:center;gap:8px;margin-top:12px}.proposal-select input{width:auto}#proposal-error{color:#a22}.node-kind{max-width:196px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0}
+
+.component-actions{display:flex;gap:8px;margin-top:24px;padding-top:16px;border-top:1px solid var(--line)}
+.component-actions button{flex:1;font-size:11px;padding:7px 4px}

@@ -1,6 +1,6 @@
 'use strict';
 window.gacchankoWorkflow=(()=>{
-  const states={unspecified:'状態未設定',planned:'構想',existing:'既存実装',verified:'検証済（申告）'};
+  const states={unspecified:'not implemented',planned:'not implemented',existing:'implemented',verified:'implemented'};
   const layers={data:'データ',control:'実行制御',event:'イベント'};
   const execution=()=>({dispatch:'sync',join:'all',after:[],maxConcurrency:1,timeoutMs:30000,bufferSize:32,overflow:'block',onError:'stop'});
   function check(graph,edgeID){
@@ -10,8 +10,7 @@ window.gacchankoWorkflow=(()=>{
     if(!graph.description.trim())add('project','project','project-description','全体で実現したいことが未入力');
     if(!edges.length)add('project','project','project-description','実装対象の接続がありません');
     for(const n of nodes){
-      if(!n.description.trim()&&!n.designInstructions?.trim())add('node',n.id,'node-description','ノードの役割・意図が未入力');
-      if(!n.implementationState||n.implementationState==='unspecified')add('node',n.id,'node-implementation','構想／既存実装の区別が未設定');
+      if(!n.name.trim())add('node',n.id,'node-name','Component Nameが未入力');
       if(['existing','verified'].includes(n.implementationState)&&!n.path.trim())add('node',n.id,'node-path','既存実装の参照先が未設定');
     }
     const adjacency=new Map(graph.nodes.map(n=>[n.id,[]])),reachable=new Map();

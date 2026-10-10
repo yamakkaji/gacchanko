@@ -2,6 +2,8 @@
 
 schemaVersion 1に任意フィールドを追加しています。旧ファイルはそのまま開けます。
 
+Inspectorは `not implemented` / `implemented` の2択です。変更するとそれぞれ `planned` / `existing` を保存します。旧値は表示だけでは書き換えず、`unspecified` は未実装側、`verified` は実装済み側に表示します。
+
 ノードの `implementationState` は `unspecified`（省略時）、`planned`、`existing`、`verified`。ユーザーの申告であり、検証レポートとは別です。既存実装の指定には参照先を記入してください。
 
 接続の `layer` は `data`（省略時）、`control`、`event`。dataは値の受け渡し、controlはソース完了後の対象起動、eventはイベントごとの対象起動です。従来の `mode` は片方向／リクエスト応答という通信形式として保持します。リクエスト応答の返り値は同じエッジに含みます。

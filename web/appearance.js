@@ -56,8 +56,8 @@ window.gacchankoAppearance=(()=>{
     return {point,tangent,samples,length,at,d,parts:segments.length};
   }
   function mix(a,b,t){return '#'+[1,3,5].map(i=>Math.round(parseInt(a.slice(i,i+2),16)*(1-t)+parseInt(b.slice(i,i+2),16)*t).toString(16).padStart(2,'0')).join('');}
-  function render(a,b,{settings,zoom=1,id='preview',statusColour='#a8a2d6',request=false,selected=false,loopBottom}){
-    const s=normalize(settings),g=geometry(a,b,{loopBottom}),gradient=['gradient','both'].includes(s.style),pattern=['pattern','both'].includes(s.style);
+  function render(a,b,{settings,zoom=1,id='preview',statusColour='#a8a2d6',request=false,selected=false,loopBottom,geometry:cachedGeometry}){
+    const s=normalize(settings),g=cachedGeometry||geometry(a,b,{loopBottom}),gradient=['gradient','both'].includes(s.style),pattern=['pattern','both'].includes(s.style);
     const d=g.d;
     const colour=s.style==='solid'?statusColour:s.source;
     let svg=selected?`<path class="edge-selection" d="${d}" stroke-width="${(s.width+6)/zoom}"/>`:'';

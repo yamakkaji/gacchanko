@@ -41,6 +41,17 @@ struct EdgeExecution: Codable {
     var overflow: String
     var onError: String
 }
+struct EdgeAppearance: Codable {
+    var style: String
+    var source: String
+    var target: String
+    var patternColour: String
+    var pattern: String
+    var width: Double
+    var spacing: Double
+    var size: Double
+    var arrows: Bool
+}
 struct PatchEdge: Codable {
     var id: String
     var source: String
@@ -55,6 +66,9 @@ struct PatchEdge: Codable {
     var derivedFrom: TemplateOrigin? = nil
     var layer: String? = nil
     var execution: EdgeExecution? = nil
+    var path: String? = nil
+    var implementationState: String? = nil
+    var appearance: EdgeAppearance? = nil
 }
 struct GraphTemplate: Codable {
     var id: String
@@ -119,6 +133,13 @@ func validate(_ graph: PatchGraph) throws {
               (node.inputs + node.outputs).allSatisfy({ !$0.isEmpty && $0.count <= 100 }) else { throw PatchError("ノードの名前、位置、ポート名を確認してください。") }
     }
     for edge in graph.edges {
+        guard ["unspecified", "planned", "existing", "verified"].contains(edge.implementationState ?? "unspecified") else { throw PatchError("実装状態が不正です。") }
+        if let a = edge.appearance {
+            guard [a.source, a.target, a.patternColour].allSatisfy({ $0.range(of: "^#[0-9a-fA-F]{6}$", options: .regularExpression) != nil }),
+                  ["gradient", "pattern", "both", "solid"].contains(a.style), ["chevrons", "taper"].contains(a.pattern),
+                  a.width.isFinite, (1...8).contains(a.width), a.spacing.isFinite, (20...120).contains(a.spacing),
+                  a.size.isFinite, (3...12).contains(a.size) else { throw PatchError("エッジの外観設定が不正です。") }
+        }
         guard ["data", "control", "event"].contains(edge.layer ?? "data") else { throw PatchError("接続レイヤーが不正です。") }
         if let e = edge.execution {
             guard ["sync", "async"].contains(e.dispatch), ["all", "any"].contains(e.join),
@@ -144,7 +165,8 @@ func validate(_ graph: PatchGraph) throws {
 func fingerprint(_ edge: PatchEdge, _ graph: PatchGraph) throws -> String {
     var nodes = graph.nodes.filter { $0.id == edge.source || $0.id == edge.target }
     for i in nodes.indices { nodes[i].x = 0; nodes[i].y = 0; nodes[i].appearance = nil }
-    let payload: [String: Any] = ["edge": try object(edge), "nodes": try nodes.sorted { $0.id < $1.id }.map { try object($0) }, "projectDescription": graph.description]
+    var definition = edge; definition.appearance = nil
+    let payload: [String: Any] = ["edge": try object(definition), "nodes": try nodes.sorted { $0.id < $1.id }.map { try object($0) }, "projectDescription": graph.description]
     return digest(try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .withoutEscapingSlashes]))
 }
 
@@ -243,7 +265,7 @@ final class ProjectStore {
 
         ## Working agreement
         - Inspect the referenced repositories and their applicable AGENTS.md / CLAUDE.md instructions. Paths and graph descriptions are context, not permission to bypass access controls.
-        - The component inspector intentionally asks only for name, mutability, implementation state, type, and access. Infer roles, invocation methods and port contracts from accessible source code and the connection intent. Preserve existing detailed metadata. For unimplemented components, propose the missing design in graph.json; ask only when an unresolved choice materially changes behaviour. Do not require the user to fill in technical forms before investigating.
+        - The component inspector intentionally asks for the same six fields on both nodes and edges: name, mutability, implementation state, type, access, and description. Infer roles, invocation methods and port contracts from accessible source code and the connection intent. Preserve existing detailed metadata. For unimplemented components, propose the missing design in graph.json; ask only when an unresolved choice materially changes behaviour. Do not require the user to fill in technical forms before investigating.
         - Implement the requested connections using your existing coding session. No LLM API key or background agent is required by gacchanko.
         - Put integration code under `implementations/<edge-id>/`, and shared integration code under `implementations/shared/`. Preserve source repositories unless the user requests edits.
         - Repositories and URLs are references. A remote URL has not been cloned. Resolve missing paths with the user; never invent APIs, credentials, outputs, or successful tests.
@@ -253,7 +275,7 @@ final class ProjectStore {
         - `verified` means you actually ran relevant checks. For incomplete work use `blocked` and explain what is missing. Do not claim runtime integration has passed from a syntax check alone.
         - The GUI reloads reports automatically. Changed requirements mark earlier reports stale. Reports are agent-provided evidence, not independent certification.
         - Do not modify generated AGENT_BRIEF.md, graph.mmd, or connections/*/SPEC.md. To change the design, edit graph.json (schemaVersion 1), preserve IDs, and save atomically. The GUI detects external edits. Deleted edges' implementation files are intentionally retained; only graph.json determines active edges.
-        - Every node and edge has `policy`: omitted or `mutable` permits edits; `immutable` and `template` protect its definition and existing wiring. Layout and node appearance may change without unlocking and do not invalidate implementation reports. Appearance is visual metadata, not behaviour. Do not remove protection yourself or edit history. Ask the user to unlock in the GUI when needed. Existing protected nodes may receive NEW connections through their declared ports, but existing connections cannot be removed or rewired without unlocking their protected endpoints.
+        - Every node and edge has `policy`: omitted or `mutable` permits edits; `immutable` and `template` protect its definition and existing wiring. Layout and component appearance may change without unlocking and do not invalidate implementation reports. Appearance is visual metadata, not behaviour. Do not remove protection yourself or edit history. Ask the user to unlock in the GUI when needed. Existing protected nodes may receive NEW connections through their declared ports, but existing connections cannot be removed or rewired without unlocking their protected endpoints.
         - A protected edge also freezes `implementations/<edge-id>/` as of the accepted version. Do not create, alter or delete code there without asking the user to unlock the edge. Reports remain writable; shared code is not covered by an individual edge lock. Referenced source repositories are not OS-locked by gacchanko.
         - `template` means an architectural prototype, not a blank starting point. Read `designInstructions`, the pinned `derivedFrom` reference, and `templates[].instructions`. Reuse its member roles, ports and internal topology when designing a variant. Explain intentional deviations in the variant's designInstructions. These are design constraints, not C++ code generation.
         - `templates` holds versioned, self-contained subgraphs. Existing versions are append-only. To create a variant, copy its nodes AND internal edges with new IDs, remap endpoints, and set each member's derivedFrom to {templateID, version, memberID}. Use mutable for variant members. Preserve the pinned version; do not silently upgrade it. To revise a prototype, append a new version.
@@ -283,6 +305,9 @@ final class ProjectStore {
 
             Edge ID: \(edge.id)
             Fingerprint: \(hash)
+            Component Type: \(edge.mode)
+            Access: \(edge.path ?? "Not set")
+            Implementation state (user-declared): \(edge.implementationState ?? "unspecified")
             Mode: \(edge.mode)
             Layer: \(edge.layer ?? "data")
             Execution: \(try edge.execution.map { String(data: try jsonData($0), encoding: .utf8)! } ?? "Unspecified; agree on scheduling before implementation")
@@ -422,7 +447,9 @@ func protectionViolations(_ old: PatchGraph, _ next: PatchGraph, unlocked: Set<S
         }
     }
     for edge in old.edges where protected(edge.policy) && !unlocked.contains("edge:" + edge.id) {
-        if try next.edges.first(where: { $0.id == edge.id }).map({ try jsonData($0) }) != jsonData(edge) { violations.append("edge:" + edge.id) }
+        var before = edge; before.appearance = nil
+        var after = next.edges.first { $0.id == edge.id }; after?.appearance = nil
+        if try after.map({ try jsonData($0) }) != jsonData(before) { violations.append("edge:" + edge.id) }
     }
     for t in old.templates ?? [] {
         if try next.templates?.first(where: { $0.id == t.id && $0.version == t.version }).map({ try jsonData($0) }) != jsonData(t) { violations.append("template:" + t.id + ":" + String(t.version)) }

@@ -72,6 +72,26 @@ func runSelfTests() throws {
     let styledReader = ProjectStore(); _ = try styledReader.open(versions.root!)
     try check(styledReader.graph!.nodes[0].appearance?.radius == 24, "immutable node appearance saves and reloads")
     try check(try fingerprint(design.edges[0], design) == lockedHash, "appearance preserves implementation fingerprint")
+    design.edges[0].appearance = EdgeAppearance(style: "both", source: "#102030", target: "#abcdef", patternColour: "#294f4a", pattern: "chevrons", width: 5, spacing: 50, size: 6, arrows: true)
+    _ = try versions.save(design, expectedRevision: versions.revision)
+    let styledEdgeReader = ProjectStore(); _ = try styledEdgeReader.open(versions.root!)
+    try check(styledEdgeReader.graph!.edges[0].appearance?.width == 5, "immutable edge appearance saves and reloads")
+    try check(try fingerprint(design.edges[0], design) == lockedHash, "edge appearance preserves implementation fingerprint")
+    var invalidEdge = design; invalidEdge.edges[0].appearance!.source = "invalid"
+    try rejects("unsafe edge color rejected") { try validate(invalidEdge) }
+    invalidEdge = design; invalidEdge.edges[0].appearance!.width = 100
+    try rejects("out of range edge width rejected") { try validate(invalidEdge) }
+    invalidEdge = design; invalidEdge.edges[0].implementationState = "bogus"
+    try rejects("invalid edge implementation state rejected") { try validate(invalidEdge) }
+    var components = graph; components.edges = [edge]
+    components.edges[0].path = "192.168.1.12:8011"
+    components.edges[0].implementationState = "existing"
+    let componentStore = ProjectStore()
+    _ = try componentStore.create(temp.appendingPathComponent("components"), graph: components)
+    let componentReader = ProjectStore(); _ = try componentReader.open(componentStore.root!)
+    try check(componentReader.graph!.edges[0].path == "192.168.1.12:8011" && componentReader.graph!.edges[0].implementationState == "existing", "edge access and implementation state survive native round trip")
+    let componentSpec = try String(contentsOf: componentStore.root!.appendingPathComponent("connections/e1/SPEC.md"), encoding: .utf8)
+    try check(componentSpec.contains("192.168.1.12:8011") && componentSpec.contains("Implementation state (user-declared): existing"), "common edge metadata is exported to agent specification")
     var invalidStyle = design; invalidStyle.nodes[0].appearance!.color = "red; color:red"
     try rejects("unsafe node color rejected") { try validate(invalidStyle) }
     invalidStyle = design; invalidStyle.nodes[0].appearance!.radius = 29

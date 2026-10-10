@@ -32,8 +32,8 @@ const settle=()=>new Promise(r=>setTimeout(r,10));
  $('#check-design').click();check(!$('#modal').textContent.includes('構想／既存実装'),'design check does not demand hidden component details');$('#modal').close();
  check(!$('.node.design-incomplete'),'unspecified legacy components need no extra form fields');
  api.select('node','source');input('#node-implementation','planned');check($('.node[data-node="source"] .node-kind').textContent.includes('not implemented'),'node shows planned implementation status');
- api.select('edge','wire');input('#edge-layer','event');input('#execution-dispatch','async');input('#execution-maxConcurrency','3');
- check(api.graph.edges[0].execution.maxConcurrency===3&&api.graph.edges[0].layer==='event','edge stores async concurrency and layer');
+ api.select('edge','wire');$('#edge-details').click();input('#edge-layer','event');input('#execution-dispatch','async');input('#execution-maxConcurrency','3');
+ check(api.graph.edges[0].execution.maxConcurrency===3&&api.graph.edges[0].layer==='event','edge stores async concurrency and layer');$('#modal').close();
  input('#edge-layer-filter','data');check(!$('.edge-group')&&!$('.edge-endpoint'),'layer filter hides edges and their reconnection handles');input('#edge-layer-filter','all');
  await api.handoff('wire');check($('#handoff-incomplete'),'handoff presents incomplete-design warning');$('#modal').close();
  const wf=w.gacchankoWorkflow;
@@ -50,12 +50,12 @@ const settle=()=>new Promise(r=>setTimeout(r,10));
  api.redo();check(api.graph.nodes[0].appearance.radius===24,'radius gesture can be redone');
  $('#modal').close();api.select('node','source');
  $('[data-select-node="target"]').dispatchEvent(new w.MouseEvent('click',{bubbles:true,shiftKey:true}));
- input('#node-surface','filled');
+ $('#node-appearance-action').click();input('#node-surface','filled');
  check(api.graph.nodes.every(n=>n.appearance.surface==='filled')&&api.graph.nodes[0].appearance.radius===24&&api.graph.nodes[1].appearance.radius===8,'batch style changes preserve individual untouched fields');
  await api.save();check(stored.nodes[0].appearance.color==='#715669','appearance included in saved graph');
  const proto=w.gacchankoDesign.capture(api.graph,['source'],{id:'style-proto',name:'Styled',instructions:''});
  check(w.gacchankoDesign.instantiate(proto,()=> 'styled-variant').nodes[0].appearance.color==='#715669','template variant inherits appearance');
- $('#reset-node-appearance').click();check(api.graph.nodes.every(n=>!n.appearance),'batch reset removes overrides');
+ $('#reset-node-appearance').click();check(api.graph.nodes.every(n=>!n.appearance),'batch reset removes overrides');$('#modal').close();
  api.select('node','source');
  const look=w.gacchankoNodeAppearance;
  for(const color of [...look.presets.map(p=>p[1]),'#ffffff','#000000','#ffff00']){const t=look.tokens({color});assert(look.contrast(t.accent,t.container)>=4.5&&look.contrast(t.onContainer,t.container)>=4.5);}
@@ -99,7 +99,7 @@ const settle=()=>new Promise(r=>setTimeout(r,10));
  api.cleanState({project:{schemaVersion:1,name:'Layers',description:'Layer regression',nodes:[n('a',0),n('b',350)],edges:[]},root:'',revision:'',reports:{}});
  for(const layer of ['control','event','data']){
    input('#edge-layer-filter',layer);api.createConnection('a','b','out','in');
-   check(api.graph.edges.at(-1).layer===layer&&$('.edge-group')&&$('#edge-layer').value===layer,'new '+layer+' edge belongs to active layer and remains visible');
+   check(api.graph.edges.at(-1).layer===layer&&$('.edge-group')&&$('#edge-details'),'new '+layer+' edge belongs to active layer and remains visible');
    const before=api.graph.edges.length;api.createConnection('a','b','out','in');
    check(api.graph.edges.length===before,'duplicate in '+layer+' layer rejected');
  }

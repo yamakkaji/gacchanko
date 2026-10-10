@@ -66,3 +66,5 @@ footer{height:23px;min-height:23px;box-shadow:none;background:#edeef1e6;border-t
 
 .component-actions{display:flex;gap:8px;margin-top:24px;padding-top:16px;border-top:1px solid var(--line)}
 .component-actions button{flex:1;font-size:11px;padding:7px 4px}
+
+.component-appearance-action{margin-top:24px}

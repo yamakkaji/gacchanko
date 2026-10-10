@@ -10,7 +10,7 @@ const appearance=window.gacchankoAppearance;
 const design=window.gacchankoDesign;
 const nodeLook=window.gacchankoNodeAppearance;
 const workflow=window.gacchankoWorkflow;
-let checkedDesign=false,edgeLayerFilter="all",connectionDraftID=null;
+let checkedDesign=false,edgeLayerFilter="all";
 let historyState={}, savedGraph=null, pendingExternal=null, changeOverlay=null, overlayFiles=null;
 let edgeAppearance=appearance.load();
 let nodeAppearanceExpanded=false;
@@ -110,7 +110,7 @@ function renderEdges(){
     const a=portPoint(e.source,e.sourcePort,'out'),b=portPoint(e.target,e.targetPort,'in');
     const route=edgeRoute(e.source,e.target,e.id),geometry=appearance.geometry(a,b,route),mid=geometry.point(.5),x=mid.x,y=mid.y, label=((e.layer||'data')==='control'?'▶ ':e.layer==='event'?'ϟ ':'')+(e.execution?.dispatch==='async'?'⇢ ':'')+(design.locked(e)?(e.policy==='template'?'◇ ':'🔒 '):e.derivedFrom?'↳ ':'')+(e.mode==='request'?'↔ ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
     const colour={verified:'#416762',implemented:'#715669',stale:'#9a6a23',blocked:'#a54844'}[status(e.id)]||'#486080';
-    return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-layer="${esc(e.layer||'data')}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${geometry.d}"/>${appearance.render(a,b,{...route,geometry,settings:edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
+    return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-layer="${esc(e.layer||'data')}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${geometry.d}"/>${appearance.render(a,b,{...route,geometry,settings:e.appearance||edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
   }).join('')+connectionPreview();
   $$('.edge-group').forEach(el=>{
     el.classList.toggle('reconnecting',connecting?.edgeID===el.dataset.edge);
@@ -261,7 +261,7 @@ function createConnection(source,target,sourcePort,targetPort){
   if(graph.edges.some(e=>(e.layer||'data')===layer&&e.source===source&&e.target===target&&e.sourcePort===sourcePort&&e.targetPort===targetPort)){toast('このレイヤーのポート間には接続がすでにあります。');renderEdges();return;}
   const edge={id:uid('edge'),source,target,sourcePort,targetPort,layer,label:'新しい接続',intent:'',mode:'data',policy:'mutable',designInstructions:''};
   mutate(()=>{graph.edges.push(edge);selected={type:'edge',id:edge.id};});
-  connectionDraftID=edge.id;renderInspector(true);setTimeout(()=>$('#edge-intent')?.focus(),30);
+  renderInspector(true);setTimeout(()=>$('#edge-intent')?.focus(),30);
 }
 function invalidateEdges(nodeID,edgeID){for(const e of graph.edges){if((edgeID&&e.id===edgeID)||(nodeID&&(e.source===nodeID||e.target===nodeID))){if(reports[e.id])reports[e.id]={...reports[e.id],status:'stale'};}}}
 function makeNode(values={},point){const r=$('#canvas').getBoundingClientRect();const pos=point||canvasPoint(r.left+r.width/2-112,r.top+r.height/2-70);return{id:uid('node'),name:'New component',path:'',kind:'directory',description:'',command:'',inputs:['in'],outputs:['out'],policy:'mutable',designInstructions:'',implementationState:'planned',x:pos.x,y:pos.y,...values};}
@@ -284,32 +284,13 @@ function bindText(id, read, apply, required=false){
 function renderInspector(force=false){
   const key=selected?selected.type+(selected.id||selected.ids.join(',')):'project';if(!force&&inspectorKey===key)return;inspectorKey=key;
   const panel=$('#inspector');
-  if(selected?.type==='node'){
-    const n=graph.nodes.find(n=>n.id===selected.id);if(!n){selected=null;return renderInspector(true);}
-    const locked=design.locked(n),implemented=['existing','verified'].includes(n.implementationState);
-    panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">COMPONENT</span></div>${field('Component Name','node-name',n.name)}<label class="field"><span>Mutability</span><select id="design-policy"><option value="mutable" ${!locked?'selected':''}>mutable</option><option value="immutable" ${locked?'selected':''}>immutable</option></select></label><label class="field"><span>Implementation</span><select id="node-implementation"><option value="planned" ${!implemented?'selected':''}>not implemented</option><option value="existing" ${implemented?'selected':''}>implemented</option></select></label><label class="field"><span>Component Type</span><select id="node-kind">${Object.keys(symbols).map(k=>`<option ${k===n.kind?'selected':''}>${k}</option>`).join('')}</select></label>${field('Access','node-path',n.path)}<button class="wide-button" id="set-node-path">Browse…</button><div class="component-actions"><button id="node-appearance-action">外観</button><button id="capture-template">原型に登録</button><button class="danger" id="delete-selected">削除</button></div>`;
-    $('#node-path').placeholder='/path/to/component, https://…, IP address';
-    $('#node-path').spellcheck=false;
-    for(const prop of ['name','path'])bindText('node-'+prop,()=>n[prop],value=>{n[prop]=value;invalidateEdges(n.id);},prop==='name');
-    $('#node-kind').onchange=e=>mutate(()=>{n.kind=e.target.value;invalidateEdges(n.id);});
-    $('#node-implementation').onchange=e=>mutate(()=>{n.implementationState=e.target.value;invalidateEdges(n.id);});
-    $('#design-policy').onchange=event=>{
-      if(locked){event.target.value='immutable';safe(()=>unlockDesign('node',n))();}
-      else mutate(()=>{n.policy=event.target.value;invalidateEdges(n.id);});
-    };
-    if(locked)for(const control of $$('#inspector input,#node-kind,#node-implementation,#set-node-path,#delete-selected'))control.disabled=true;
-    $('#capture-template').onclick=()=>captureTemplateDialog([n.id],n.policy==='template');
-    $('#node-appearance-action').onclick=openNodeAppearance;
-    $('#set-node-path').onclick=safe(async()=>{const paths=await call('chooseNodes');if(paths.length){const value=await call('inspect',{path:paths[0]});mutate(()=>{n.path=value.path;if(!n.description)n.description=value.description;invalidateEdges(n.id);});}});
+  if(['node','edge'].includes(selected?.type)){
+    const kind=selected.type,item=(kind==='node'?graph.nodes:graph.edges).find(v=>v.id===selected.id);
+    if(!item){selected=null;return renderInspector(true);}
+    renderComponentInspector(kind,item);
   }else if(selected?.type==='nodes'){
-    const count=selectedNodeIDs().length;
-    panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">COMPONENTS</span></div><h2>${count} 個を選択</h2><button class="wide-button danger" id="delete-selected">選択したコンポーネントを削除</button>`;
-  }else if(selected?.type==='edge'){
-    const e=graph.edges.find(e=>e.id===selected.id);if(!e){selected=null;return renderInspector(true);}const a=graph.nodes.find(n=>n.id===e.source),b=graph.nodes.find(n=>n.id===e.target);const report=reports[e.id];
-    panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">CONNECTION</span><span class="badge">${statusNames[status(e.id)]}</span></div><div class="connection-endpoint"><span>${esc(a.name)}</span><small>${esc(e.sourcePort)}</small></div><div class="endpoint-arrow">${e.mode==='request'?'↕ REQUEST / RESPONSE':'↓'}</div><div class="connection-endpoint"><span>${esc(b.name)}</span><small>${esc(e.targetPort)}</small></div>${field('接続の名前','edge-label',e.label)}<label class="field"><span>接続の形式</span><select id="edge-mode"><option value="data" ${e.mode==='data'?'selected':''}>→ データの受け渡し</option><option value="request" ${e.mode==='request'?'selected':''}>↔ リクエストと応答</option><option value="event" ${e.mode==='event'?'selected':''}>→ イベント / トリガー</option></select></label>${field('実現したいこと','edge-intent',e.intent,{textarea:true,cls:'intent'})}<button class="primary wide-button" id="edge-handoff">↗ この接続をエージェントに渡す</button><div class="status-card ${status(e.id)}"><strong>● ${statusNames[status(e.id)]}</strong>${report?.summary?`<p>${esc(report.summary)}</p>`:''}</div>${Array.isArray(report?.checks)?`<details class="report-checks"><summary>エージェントの確認記録</summary><pre class="artifact">${report.checks.map(v=>esc(v)).join('\n\n')}</pre></details>`:''}<hr><span class="eyebrow">PROJECT FILES</span><p class="artifact">connections/${esc(e.id)}/SPEC.md<br>implementations/${esc(e.id)}/<br>reports/${esc(e.id)}.json</p>${Array.isArray(report?.files)?`<div class="artifact">${report.files.map(v=>esc(v)).join('<br>')}</div>`:''}<button class="wide-button danger" id="delete-selected">接続を削除</button>`;
-    for(const prop of ['label','intent'])bindText('edge-'+prop,()=>e[prop],value=>{e[prop]=value;invalidateEdges(null,e.id);});
-    $('#edge-mode').onchange=event=>mutate(()=>{e.mode=event.target.value;invalidateEdges(null,e.id);});
-    $('#edge-handoff').onclick=safe(()=>handoff(e.id));
+    panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">COMPONENTS</span></div><h2>${selectedNodeIDs().length} 個を選択</h2><button class="wide-button danger" id="delete-selected">選択したコンポーネントを削除</button><button class="wide-button" id="capture-template">選択した構成を原型に登録</button>`;
+    $('#capture-template').onclick=()=>captureTemplateDialog(selectedNodeIDs());
   }else{
     panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">PROJECT OVERVIEW</span></div>${field('プロジェクト名','project-name',graph.name)}${field('全体で実現したいこと','project-description',graph.description,{textarea:true})}${root?`<p class="artifact" style="margin-top:20px">${esc(root)}</p><button class="wide-button" id="copy-location">プロジェクトのパスをコピー</button>`:''}`;
     bindText('project-name',()=>graph.name,value=>{graph.name=value;},true);
@@ -317,32 +298,72 @@ function renderInspector(force=false){
     if($('#copy-location'))$('#copy-location').onclick=safe(async()=>{await call('copy',{text:root});toast('パスをコピーしました。');});
   }
   if($('#delete-selected'))$('#delete-selected').onclick=safe(deleteSelected);
-  renderWorkflowInspector();
-  renderDesignInspector();
-  if(selected?.type==='nodes')renderNodeAppearanceInspector();
-  showConnectionSetup();
+  if(selectedNodeIDs().length){
+    panel.insertAdjacentHTML('beforeend','<button class="wide-button component-appearance-action" id="node-appearance-action">見た目を変更…</button>');
+    $('#node-appearance-action').onclick=openNodeAppearance;
+  }else if(selected?.type==='edge'){
+    panel.insertAdjacentHTML('beforeend','<button class="wide-button component-appearance-action" id="edge-appearance-action">見た目を変更…</button>');
+    $('#edge-appearance-action').onclick=()=>appearanceSettings(selected.id);
+  }
 }
-function appearanceSettings(){
-  const s=edgeAppearance;
+function renderComponentInspector(kind,item){
+  const isNode=kind==='node',locked=design.locked(item),report=isNode?null:reports[item.id];
+  const state=item.implementationState??(!isNode&&['implemented','verified'].includes(report?.status)?'existing':'planned');
+  const name=isNode?'name':'label',description=isNode?'description':'intent',type=isNode?'kind':'mode';
+  const types=isNode?Object.fromEntries(Object.keys(symbols).map(k=>[k,k])):{data:'data',request:'request / response',event:'event'};
+  const options=(values,current)=>Object.entries(values).map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(label)}</option>`).join('');
+  const panel=$('#inspector');
+  panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">COMPONENT · ${isNode?'NODE':'EDGE'}</span></div>${field('Component Name',kind+'-'+name,item[name])}<label class="field"><span>Mutability</span><select id="design-policy">${options({mutable:'mutable',immutable:'immutable'},locked?'immutable':'mutable')}</select></label><label class="field"><span>Implementation</span><select id="${kind}-implementation">${options({planned:'not implemented',existing:'implemented'},['existing','verified'].includes(state)?'existing':'planned')}</select></label><label class="field"><span>Component Type</span><select id="${kind}-${type}">${options(types,item[type])}</select></label>${field('Access',kind+'-path',item.path||'')}<button class="wide-button" id="set-component-path">Browse…</button>${field('Description',kind+'-'+description,item[description],{textarea:true})}`;
+  const invalidate=()=>isNode?invalidateEdges(item.id):invalidateEdges(null,item.id);
+  for(const prop of [name,'path',description])bindText(kind+'-'+prop,()=>item[prop]||'',value=>{item[prop]=value;invalidate();},prop===name);
+  $('#'+kind+'-path').placeholder='/path/to/component, https://…, IP address';$('#'+kind+'-path').spellcheck=false;
+  $('#'+kind+'-'+type).onchange=e=>mutate(()=>{item[type]=e.target.value;invalidate();});
+  $('#'+kind+'-implementation').onchange=e=>mutate(()=>{item.implementationState=e.target.value;invalidate();});
+  $('#design-policy').onchange=event=>{
+    if(locked){event.target.value='immutable';safe(()=>unlockDesign(kind,item))();}
+    else mutate(()=>{item.policy=event.target.value;invalidate();});
+  };
+  $('#set-component-path').onclick=safe(async()=>{const paths=await call('chooseNodes');if(paths.length){const value=await call('inspect',{path:paths[0]});mutate(()=>{item.path=value.path;if(!item[description])item[description]=value.description;invalidate();});}});
+  if(!isNode){
+    const a=graph.nodes.find(n=>n.id===item.source),b=graph.nodes.find(n=>n.id===item.target);
+    panel.insertAdjacentHTML('beforeend',`<p class="subtle">${esc(a.name)} ${item.mode==='request'?'↔':'→'} ${esc(b.name)}</p><button class="primary wide-button" id="edge-handoff">↗ このコンポーネントをエージェントに渡す</button><button class="wide-button" id="edge-details">接続の詳細…</button><div class="status-card ${status(item.id)}"><strong>実装レポート · ${report?statusNames[status(item.id)]:'未報告'}</strong>${report?.summary?`<p>${esc(report.summary)}</p>`:''}</div>${report?`<details class="report-checks"><summary>エージェントの確認記録</summary><pre class="artifact">${[...(report.checks||[]),...(report.files||[])].map(v=>esc(v)).join('\n')}</pre></details>`:''}`);
+    $('#edge-handoff').onclick=safe(()=>handoff(item.id));$('#edge-details').onclick=()=>openEdgeDetails(item);
+  }
+  panel.insertAdjacentHTML('beforeend','<div class="component-actions"><button id="capture-template">原型に登録</button><button class="danger" id="delete-selected">削除</button></div>');
+  $('#capture-template').onclick=()=>captureTemplateDialog(isNode?[item.id]:[item.source,item.target],item.policy==='template');
+  if(locked)for(const control of $$('input,textarea,select,#set-component-path,#delete-selected',panel))if(control.id!=='design-policy')control.disabled=true;
+}
+function openEdgeDetails(item){
+  modal(`<h2>接続の詳細</h2><div id="edge-details-content">${field('設計指示 / variantでの差異','design-instructions',item.designInstructions||'',{textarea:true})}</div><div class="modal-actions"><button>閉じる</button></div>`);
+  const panel=$('#edge-details-content');
+  bindText('design-instructions',()=>item.designInstructions||'',value=>{item.designInstructions=value;invalidateEdges(null,item.id);});
+  renderWorkflowInspector(panel);
+  if(design.locked(item))for(const control of $$('input,textarea,select,button',panel))control.disabled=true;
+}
+function appearanceSettings(edgeID=null){
+  const edge=edgeID?graph.edges.find(e=>e.id===edgeID):null;
+  let settings=edge?.appearance?appearance.normalize(edge.appearance):{...edgeAppearance};
+  const s=settings;
   const options=(values,current)=>Object.entries(values).map(([value,label])=>`<option value="${value}" ${value===current?'selected':''}>${label}</option>`).join('');
   const colour=(name,label)=>`<label class="field"><span>${label}</span><input type="color" data-appearance="${name}" value="${s[name]}"></label>`;
   const slider=(name,label,min,max,step=1)=>`<label class="field"><span>${label} <output data-output="${name}">${s[name]}</output></span><input type="range" data-appearance="${name}" min="${min}" max="${max}" step="${step}" value="${s[name]}"></label>`;
-  modal(`<h2>設定</h2><span class="eyebrow">エッジの表示</span><div class="edge-preview"><div><span>out</span><span>in</span></div><svg id="appearance-preview" viewBox="0 0 440 110" role="img" aria-label="出力から入力へのエッジ表示プレビュー"></svg></div><label class="field"><span>表示方式</span><select data-appearance="style">${options({gradient:'グラデーション',pattern:'模様',both:'グラデーション＋模様',solid:'状態色（従来の表示）'},s.style)}</select></label><div class="appearance-colours">${colour('source','out 側の色')}${colour('target','in 側の色')}${colour('patternColour','模様の色')}</div><label class="field"><span>模様</span><select data-appearance="pattern">${options({chevrons:'山形 › › ›',taper:'先細りのストライプ'},s.pattern)}</select></label><div class="field-row">${slider('width','線の太さ',1,8,.5)}${slider('spacing','模様の間隔',20,120)}</div>${slider('size','模様の大きさ',3,12)}<label class="appearance-checkbox"><input type="checkbox" data-appearance="arrows" ${s.arrows?'checked':''}>矢印を表示</label><div class="modal-actions"><button type="button" id="reset-appearance">初期設定に戻す</button><button class="primary">閉じる</button></div>`);
+  modal(`<h2>${edge?esc(edge.label)+' · 見た目':'設定'}</h2><span class="eyebrow">エッジの表示</span><div class="edge-preview"><div><span>out</span><span>in</span></div><svg id="appearance-preview" viewBox="0 0 440 110" role="img" aria-label="出力から入力へのエッジ表示プレビュー"></svg></div><label class="field"><span>表示方式</span><select data-appearance="style">${options({gradient:'グラデーション',pattern:'模様',both:'グラデーション＋模様',solid:'状態色（従来の表示）'},s.style)}</select></label><div class="appearance-colours">${colour('source','out 側の色')}${colour('target','in 側の色')}${colour('patternColour','模様の色')}</div><label class="field"><span>模様</span><select data-appearance="pattern">${options({chevrons:'山形 › › ›',taper:'先細りのストライプ'},s.pattern)}</select></label><div class="field-row">${slider('width','線の太さ',1,8,.5)}${slider('spacing','模様の間隔',20,120)}</div>${slider('size','模様の大きさ',3,12)}<label class="appearance-checkbox"><input type="checkbox" data-appearance="arrows" ${s.arrows?'checked':''}>矢印を表示</label><div class="modal-actions"><button type="button" id="reset-appearance">${edge?'全体の設定に戻す':'初期設定に戻す'}</button><button class="primary">閉じる</button></div>`);
   const preview=()=>{
-    $('#appearance-preview').innerHTML=appearance.render({x:18,y:80},{x:420,y:28},{settings:edgeAppearance,id:'settings-preview'});
-    const gradient=['gradient','both'].includes(edgeAppearance.style),pattern=['pattern','both'].includes(edgeAppearance.style);
+    $('#appearance-preview').innerHTML=appearance.render({x:18,y:80},{x:420,y:28},{settings,id:'settings-preview'});
+    const gradient=['gradient','both'].includes(settings.style),pattern=['pattern','both'].includes(settings.style);
     for(const name of ['pattern','patternColour','spacing','size'])$(`[data-appearance="${name}"]`).disabled=!pattern;
     $('[data-appearance="target"]').disabled=!gradient;
-    $('[data-appearance="source"]').disabled=edgeAppearance.style==='solid';
-    $$('[data-output]').forEach(el=>el.value=edgeAppearance[el.dataset.output]);
+    $('[data-appearance="source"]').disabled=settings.style==='solid';
+    $$('[data-output]').forEach(el=>el.value=settings[el.dataset.output]);
   };
   $$('[data-appearance]').forEach(input=>input.addEventListener('input',()=>{
     const value=input.type==='checkbox'?input.checked:input.type==='range'?Number(input.value):input.value;
-    edgeAppearance=appearance.normalize({...edgeAppearance,[input.dataset.appearance]:value});
-    try{appearance.save(edgeAppearance);}catch{toast('表示設定を保存できませんでした。',true);}
+    settings=appearance.normalize({...settings,[input.dataset.appearance]:value});
+    if(edge)mutate(()=>{graph.edges.find(e=>e.id===edgeID).appearance={...settings};},{inspector:false});
+    else{edgeAppearance=settings;try{appearance.save(edgeAppearance);}catch{toast('表示設定を保存できませんでした。',true);}}
     preview();renderEdges();
   }));
-  $('#reset-appearance').onclick=()=>{edgeAppearance={...appearance.defaults};try{appearance.save(edgeAppearance);}catch{toast('表示設定を保存できませんでした。',true);}appearanceSettings();renderEdges();};
+  $('#reset-appearance').onclick=()=>{if(edge){mutate(()=>{delete graph.edges.find(e=>e.id===edgeID).appearance;},{inspector:false});appearanceSettings(edgeID);return;}edgeAppearance={...appearance.defaults};try{appearance.save(edgeAppearance);}catch{toast('表示設定を保存できませんでした。',true);}appearanceSettings();renderEdges();};
   preview();
 }
 function modal(html){const d=$('#modal');$('#modal-content').innerHTML=html;if(!d.open)d.showModal();}
@@ -726,7 +747,7 @@ $('#project-settings').onclick=()=>{selected=null;render();};$('#reveal-project'
 $('#open-project').onclick=safe(async()=>{document.activeElement?.blur();if(dirty){if(root){if(!await save(true))return;}else if(!await confirmChoice('未保存のグラフを破棄して別のプロジェクトを開きます。'))return;}const state=await call('openProject');if(state){clearTimeout(saveTimer);cleanState(state);fit();}});
 $('#reload-project').onclick=safe(async()=>{if(dirty&&!await confirmChoice('未保存の編集を破棄して、ディスクのグラフを読み込みます。必要なら先に JSON 書き出しで退避してください。'))return;clearTimeout(saveTimer);cleanState(await call('reload'));fit();});
 $('#export-draft').onclick=safe(()=>call('exportJSON',{graph}));
-$('#appearance-settings').onclick=appearanceSettings;
+$('#appearance-settings').onclick=()=>appearanceSettings();
 $('#show-help').onclick=()=>modal(`<h2>ヘルプ</h2><p>Shift＋クリック：追加選択 / 解除<br>選択した線の接点をドラッグ：付け替え<br>ポートの近くで離す：吸着して接続<br>空白をドラッグ：四角で囲ったノードを選択<br>Shift＋範囲選択：選択に追加<br>Space＋ドラッグ / 中ボタンドラッグ：画面を移動<br>Delete：選択したノード・接続を削除</p><p>① フォルダを配置し、右の出力から左の入力へ線を引きます。<br>② 線を選んで、つなぎたい内容を記入します。<br>③ 保存して「エージェントに渡す」を押します。<br>④ コピーした依頼文を、ローカルファイルにアクセスできる ChatGPT / Codex / Claude Code のチャットへ貼り付けます。</p><pre>graph.json                  設計の正本\nAGENT_BRIEF.md              エージェントへの指示\nconnections/&lt;id&gt;/SPEC.md    接続ごとの仕様\nimplementations/&lt;id&gt;/       生成コードの保存先\nreports/&lt;id&gt;.json          実装・検証の報告\ngraph.mmd                   Mermaid のグラフ</pre><p>保存済みプロジェクトの編集は自動保存されます。エージェントのレポートは約2秒ごとに読み込みます。元のリポジトリの更新は自動検知しないため、コードを変えた際は再検証を依頼してください。</p><div class="modal-actions"><button class="primary">わかりました</button></div>`);
 window.addEventListener('keydown',e=>{
   const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'');
@@ -755,27 +776,6 @@ function applyChangeOverlay(){
     const codeChanged=kind==='edge'&&(overlayFiles??historyState.files??[]).some(p=>p.startsWith('implementations/'+el.dataset[key]+'/'));
     el.classList.toggle('implementation-changed',codeChanged);
   }
-}
-function renderDesignInspector(){
-  const kind=selected?.type;
-  if(kind==='nodes'){
-    $('#inspector').insertAdjacentHTML('beforeend','<button class="wide-button" id="capture-template">選択した構成を原型に登録</button>');
-    $('#capture-template').onclick=()=>captureTemplateDialog(selectedNodeIDs());return;
-  }
-  if(kind!=='edge')return;
-  const item=(kind==='node'?graph.nodes:graph.edges).find(v=>v.id===selected.id);
-  if(!item)return;
-  const locked=design.locked(item),panel=$('#inspector');
-  if(locked)for(const control of $$('input,textarea,select,#set-node-path,#delete-selected',panel))control.disabled=true;
-  const origin=item.derivedFrom,template=origin&&graph.templates?.find(t=>t.id===origin.templateID&&t.version===origin.version);
-  panel.insertAdjacentHTML('afterbegin',`<section class="design-policy"><label class="field"><span>変更方針</span><select id="design-policy" ${locked?'disabled':''}>${['mutable','immutable','template'].map(v=>`<option ${v===(item.policy||'mutable')?'selected':''}>${v}</option>`).join('')}</select></label>${locked?'<button class="small wide-button" id="unlock-design">保護を解除…</button><small class="protection-scope">設計を保護します。参照先リポジトリの書込権限は変更しません。</small>':''}${field('設計指示 / variantでの差異','design-instructions',item.designInstructions||'',{textarea:true})}${origin?`<p class="template-origin">↳ ${esc(template?.name||origin.templateID)} · v${origin.version}<br><small>${esc(origin.memberID)}</small></p><details><summary>原型の設計指示</summary><p>${esc(template?.instructions||'')}</p></details>`:''}<button class="small wide-button" id="capture-template">${item.policy==='template'?'この原型からvariantを作成':'構成を原型に登録…'}</button></section>`);
-  $('#design-instructions').disabled=locked;
-  bindText('design-instructions',()=>item.designInstructions||'',value=>{item.designInstructions=value;if(kind==='node')invalidateEdges(item.id);else invalidateEdges(null,item.id);});
-  $('#design-policy').onchange=event=>mutate(()=>{item.policy=event.target.value;if(kind==='node')invalidateEdges(item.id);else invalidateEdges(null,item.id);});
-  $('#capture-template').onclick=()=>captureTemplateDialog(kind==='node'?[item.id]:[item.source,item.target],item.policy==='template');
-  if($('#unlock-design'))$('#unlock-design').onclick=safe(async()=>{
-    await unlockDesign(kind,item);
-  });
 }
 async function unlockDesign(kind,item){
   const selection=clone(selected);
@@ -897,17 +897,17 @@ function showDesignCheck(edgeID,forHandoff=false){
     const i=issues[Number(button.dataset.checkIssue)];$('#modal').close();edgeLayerFilter='all';$('#edge-layer-filter').value='all';
     if(i.kind==='project'){selected=null;render();}else select(i.kind,i.id);
     if(i.kind==='node')$(`[data-select-node="${i.id}"]`)?.click();else if(i.kind==='edge'){const e=graph.edges.find(e=>e.id===i.id),n=graph.nodes.find(n=>n.id===e.source),r=$('#canvas').getBoundingClientRect();view.x=r.width/2-(n.x+112)*view.zoom;view.y=r.height/2-(n.y+70)*view.zoom;transform();}
+    if(i.kind==='edge'&&(['design-instructions','edge-layer'].includes(i.field)||i.field.startsWith('execution-')))openEdgeDetails(graph.edges.find(e=>e.id===i.id));
     $('#'+i.field)?.focus();$('#'+i.field)?.scrollIntoView?.({block:'nearest'});
   });
   if(forHandoff)$('#handoff-incomplete').onclick=safe(async()=>{$('#modal').close();await handoff(edgeID,true);});
 }
-function renderWorkflowInspector(){
-  const panel=$('#inspector');
+function renderWorkflowInspector(panel=$('#inspector')){
   const options=(values,current)=>Object.entries(values).map(([v,l])=>`<option value="${v}" ${v===current?'selected':''}>${l}</option>`).join('');
   if(selected?.type!=='edge')return;
   const e=graph.edges.find(e=>e.id===selected.id),ex=e.execution||workflow.execution();
   panel.insertAdjacentHTML('beforeend',`<section class="execution-settings"><h3>レイヤーと実行順序</h3><label class="field"><span>レイヤー</span><select id="edge-layer">${options(workflow.layers,e.layer||'data')}</select></label><label class="field"><span>起動方式</span><select id="execution-dispatch">${options({sync:'同期 · 完了を待つ',async:'非同期 · キューへ送る'},ex.dispatch)}</select></label><label class="field"><span>完了待ち（同じ実行・反復内）</span><select id="execution-after" multiple size="4">${graph.edges.filter(x=>x.id!==e.id).map(x=>`<option value="${esc(x.id)}" ${ex.after.includes(x.id)?'selected':''}>${esc(x.label)} · ${esc(x.id)}</option>`).join('')}</select><small>⌘ / Ctrl で複数選択・解除。未選択なら入力やイベントから開始。</small></label><label class="field"><span>待機条件</span><select id="execution-join">${options({all:'すべて完了',any:'いずれか完了 · 1回だけ起動'},ex.join)}</select></label>${[['maxConcurrency','最大並列数',1,64],['timeoutMs','期限（ms）',1,3600000],['bufferSize','待機キュー上限',1,10000]].map(([key,label,min,max])=>`<label class="field"><span>${label}</span><input id="execution-${key}" type="number" min="${min}" max="${max}" step="1" value="${ex[key]}"></label>`).join('')}<label class="field"><span>キュー満杯時</span><select id="execution-overflow">${options({block:'送信側を待機',dropOldest:'最も古い待機項目を破棄',dropNewest:'新しい項目を破棄'},ex.overflow)}</select></label><label class="field"><span>失敗・期限切れ</span><select id="execution-onError">${options({stop:'実行を停止',continue:'エラー結果を返して継続'},ex.onError)}</select></label><button type="button" id="confirm-execution" class="wide-button">この実行設定を確定</button><small>生成コードへの仕様です。ここでは実行しません。反復・開始条件・キャンセルは設計指示に記述してください。</small></section>`);
-  $('#edge-layer').onchange=ev=>mutate(()=>{e.layer=ev.target.value;invalidateEdges(null,e.id);});
+  $('#edge-layer').onchange=ev=>{mutate(()=>{e.layer=ev.target.value;invalidateEdges(null,e.id);});openEdgeDetails(e);};
   function update(){
     const next={...ex};
     for(const key of ['dispatch','join','overflow','onError'])next[key]=$('#execution-'+key).value;
@@ -916,17 +916,10 @@ function renderWorkflowInspector(){
     if(next.dispatch==='sync')next.maxConcurrency=1;
     const visited=new Set();function reaches(id){if(id===e.id)return true;if(visited.has(id))return false;visited.add(id);return (graph.edges.find(x=>x.id===id)?.execution?.after||[]).some(reaches);}
     if(next.after.some(reaches)){toast('完了待ちが循環します。依存先を変更してください。',true);return;}
-    mutate(()=>{e.execution=next;invalidateEdges(null,e.id);});
+    mutate(()=>{e.execution=next;invalidateEdges(null,e.id);});openEdgeDetails(e);
   }
   $$('.execution-settings input,.execution-settings select').filter(x=>x.id!=='edge-layer').forEach(input=>input.onchange=update);
   $('#confirm-execution').disabled=design.locked(e);$('#confirm-execution').onclick=update;
-}
-function showConnectionSetup(){
-  if(selected?.type!=='edge'||selected.id!==connectionDraftID)return;
-  const panel=$('#inspector');panel.insertAdjacentHTML('afterbegin','<section id="connection-setup"><h3>接続の仕様</h3><p>何を渡して、何を実現しますか？</p><div id="connection-fields"></div><button type="button" id="finish-connection">入力完了</button><button type="button" id="later-connection">あとで入力</button></section>');
-  for(const id of ['edge-label','edge-intent','edge-layer']){const el=$('#'+id);if(el)$('#connection-fields').append(el.closest('.field'));}
-  $('#finish-connection').onclick=()=>{const e=graph.edges.find(e=>e.id===connectionDraftID);if(!e?.label.trim()||e.label==='新しい接続'){toast('接続の名前を入力してください。',true);$('#edge-label').focus();return;}if(!e.intent.trim()){toast('何を渡し、何を実現するかを入力してください。',true);$('#edge-intent').focus();return;}connectionDraftID=null;renderInspector(true);};
-  $('#later-connection').onclick=()=>{connectionDraftID=null;renderInspector(true);};
 }
 $('#check-design').onclick=()=>showDesignCheck();
 $('#edge-layer-filter').onchange=event=>{edgeLayerFilter=event.target.value;clearConnection(false);renderEdges();};

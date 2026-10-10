@@ -16,7 +16,7 @@ window.gacchankoDesign = (() => {
         if(!next||['source','target','sourcePort','targetPort'].some(k=>next[k]!==e[k]))result.push('wiring:'+n.id+'/'+e.id);
       }
     }
-    for(const e of before.edges.filter(locked))if(canonical(e)!==canonical(after.edges.find(v=>v.id===e.id)))result.push('edge:'+e.id);
+    for(const e of before.edges.filter(locked))if(canonical(definition(e))!==canonical(definition(after.edges.find(v=>v.id===e.id))))result.push('edge:'+e.id);
     for(const t of before.templates||[])if(canonical(t)!==canonical(after.templates?.find(v=>v.id===t.id&&v.version===t.version)))result.push('template:'+t.id);
     return result;
   }

@@ -1,0 +1,76 @@
+// Pointer-gesture regressions for node creation and persistent loose edges.
+const {JSDOM}=require('jsdom');
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const base=path.resolve(__dirname,'..');
+const dom=new JSDOM(fs.readFileSync(path.join(base,'web/index.html'),'utf8'),{url:'https://gacchanko.local/',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
+w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
+w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};
+w.HTMLElement.prototype.getBoundingClientRect=()=>({left:0,top:0,width:1200,height:900,right:1200,bottom:900});
+let stored,paths=[];
+w.gacchankoPlatform={kind:'test',async request(command,args){
+ if(command==='state')return {project:null};if(command==='dirty')return true;
+ if(command==='chooseNodes')return paths;
+ if(command==='inspect')return {name:'Imported',path:args.path,kind:'directory',inputs:[],outputs:[],description:'Imported description'};
+ if(command==='save'){stored=JSON.parse(JSON.stringify(args.graph));return {project:stored,root:'/tmp/connection.gacchanko',revision:'next',reports:{}};}
+ throw Error(command);
+},on(){return ()=>{};}};
+for(const name of ['bridge.js','appearance.js','node-appearance.js','workflow.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(base,'web',name),'utf8'));
+const $=s=>w.document.querySelector(s),tick=()=>new Promise(r=>setTimeout(r,0));
+const pointer=(el,type,p)=>el.dispatchEvent(new w.MouseEvent(type,{bubbles:true,button:0,clientX:p.x,clientY:p.y}));
+const screen=p=>{const [x,y,z]=$('#world').style.transform.match(/[-\d.]+/g).map(Number);return {x:x+p.x*z,y:y+p.y*z};};
+const port=(n,end)=>screen({x:n.x+(end==='source'?224:0),y:n.y+98.5});
+const drop=(el,start,end)=>{pointer(el,'pointerdown',start);pointer(w,'pointermove',end);pointer(w,'pointerup',end);};
+(async()=>{try{
+ await w.gacchankoReady;
+ const api=w.gacchanko,copy=v=>JSON.parse(JSON.stringify(v));
+ const initial={schemaVersion:1,name:'Connections',description:'Connect components',nodes:[api.makeNode({id:'a',name:'A'},{x:0,y:0}),api.makeNode({id:'b',name:'B'},{x:420,y:0})],edges:[]};
+ const reset=g=>api.cleanState({project:copy(g),root:'',revision:'',reports:{}});
+ const blank={x:650,y:550};
+ reset(initial);
+ drop($('[data-node="a"] .port.out'),port(api.graph.nodes[0],'source'),blank);
+ assert($('#modal').open,'new wire dropped on blank opens node chooser');
+ assert.equal(api.graph.nodes.length,2);assert.equal(api.graph.edges.length,0);
+ $('#modal').close();assert.equal(api.graph.nodes.length,2,'cancel adds nothing');
+ drop($('[data-node="a"] .port.out'),port(api.graph.nodes[0],'source'),blank);
+ $('#dialog-note').click();
+ let edge=api.graph.edges[0],added=api.graph.nodes[2];
+ assert.equal(edge.source,'a');assert.equal(edge.target,added.id);assert.equal(port(added,'target').x,blank.x);assert.equal(port(added,'target').y,blank.y);
+ api.undo();assert.equal(api.graph.nodes.length,2);assert.equal(api.graph.edges.length,0,'one undo removes both node and wire');
+ api.redo();assert.equal(api.graph.nodes.length,3);assert.equal(api.graph.edges.length,1);
+ reset(initial);
+ $('#edge-layer-filter').value='event';$('#edge-layer-filter').dispatchEvent(new w.Event('change'));
+ drop($('[data-node="a"] .port.in'),port(api.graph.nodes[0],'target'),blank);$('#dialog-note').click();
+ edge=api.graph.edges[0];added=api.graph.nodes[2];assert.equal(edge.target,'a');assert.equal(edge.source,added.id);assert.equal(edge.layer,'event');assert.equal(port(added,'source').x,blank.x);
+ $('#edge-layer-filter').value='all';$('#edge-layer-filter').dispatchEvent(new w.Event('change'));
+ reset(initial);
+ drop($('[data-node="a"] .port.out'),port(api.graph.nodes[0],'source'),blank);$('#dialog-url').click();$('#path-entry').value='https://example.test/component';$('#add-reference').click();await tick();await tick();
+ assert.equal(api.graph.nodes[2].path,'https://example.test/component');assert.equal(api.graph.nodes[2].inputs[0],'in','import with no input gains a connectable port');assert.equal(api.graph.edges[0].target,api.graph.nodes[2].id);
+ reset(initial);
+ drop($('[data-node="a"] .port.out'),port(api.graph.nodes[0],'source'),blank);$('#dialog-folder').click();await tick();assert($('#modal').open,'native chooser cancellation retains creation context');paths=['/tmp/selected'];$('#dialog-folder').click();await tick();await tick();assert.equal(api.graph.edges.length,1);assert.equal(api.graph.nodes[2].path,paths[0]);
+ reset(initial);api.createConnection('a','b','out','in');
+ Object.assign(api.graph.edges[0],{intent:'Preserve all semantic content',label:'Rich edge',designInstructions:'Keep delivery guarantees',path:'/adapter',implementationState:'existing',execution:w.gacchankoWorkflow.execution(),appearance:copy(w.gacchankoAppearance.defaults)});
+ const original=copy(api.graph.edges[0]),id=original.id;
+ api.select('edge',id);drop($('[data-reconnect="target"]'),port(api.graph.nodes[1],'target'),blank);
+ edge=api.graph.edges[0];assert(!$('#modal').open,'rewiring does not open node chooser');assert.equal(edge.target,'');assert.equal(edge.targetPort,'');assert(edge.targetPosition);assert.equal($('.edge-loose-end').getAttribute('cx'),String(edge.targetPosition.x));
+ const semantic=copy(edge);semantic.target=original.target;semantic.targetPort=original.targetPort;delete semantic.targetPosition;assert.deepEqual(semantic,original,'detaching preserves identity and all semantic metadata');
+ assert($('#inspector').textContent.includes('未接続'));assert(w.gacchankoWorkflow.check(api.graph).some(i=>i.message.includes('未接続')));
+ api.undo();assert.deepEqual(copy(api.graph.edges[0]),original);api.redo();assert.equal(api.graph.edges[0].target,'');
+ const loose=copy(api.graph);api.cleanState({project:loose,root:'/tmp/connection.gacchanko',revision:'initial',reports:{}});await api.save(false);reset(stored);assert($('.edge-loose-end'),'loose endpoint restored after save/reload');
+ api.select('edge',id);const loosePoint=screen(api.graph.edges[0].targetPosition);
+ drop($('[data-reconnect="target"]'),loosePoint,port(api.graph.nodes[1],'target'));assert.deepEqual(copy(api.graph.edges[0]),original,'reconnect restores endpoint and clears free position');
+ api.select('edge',id);drop($('[data-reconnect="source"]'),port(api.graph.nodes[0],'source'),blank);assert.equal(api.graph.edges[0].source,'');
+ api.select('edge',id);drop($('[data-reconnect="target"]'),port(api.graph.nodes[1],'target'),{x:950,y:700});assert.equal(api.graph.edges[0].target,'');assert.equal(w.document.querySelectorAll('.edge-loose-end').length,2,'both ends can remain loose');
+ const floatingOnly=copy(api.graph);floatingOnly.nodes=[];
+ api.select('edge',id);drop($('[data-reconnect="source"]'),screen(api.graph.edges[0].sourcePosition),port(api.graph.nodes[0],'source'));assert.equal(api.graph.edges[0].source,'a');assert.equal(api.graph.edges[0].target,'');
+ api.select('edge',id);drop($('[data-reconnect="target"]'),screen(api.graph.edges[0].targetPosition),port(api.graph.nodes[1],'target'));assert.deepEqual(copy(api.graph.edges[0]),original);
+ api.select('edge',id);pointer($('[data-reconnect="target"]'),'pointerdown',port(api.graph.nodes[1],'target'));pointer(w,'pointermove',blank);w.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));pointer(w,'pointerup',blank);assert.deepEqual(copy(api.graph.edges[0]),original,'Escape leaves original edge intact');
+ api.select('edge',id);drop($('[data-reconnect="target"]'),port(api.graph.nodes[1],'target'),{x:1400,y:950});assert.deepEqual(copy(api.graph.edges[0]),original,'outside canvas cancels');
+ api.select('edge',id);drop($('[data-reconnect="target"]'),port(api.graph.nodes[1],'target'),port(api.graph.nodes[0],'source'));assert.deepEqual(copy(api.graph.edges[0]),original,'incompatible port cancels');
+ api.graph.edges[0].policy='immutable';api.render();assert(!$('[data-reconnect]'),'protected edges cannot be detached');
+ reset(floatingOnly);api.fit();assert($('#empty-state').hidden);assert(!$('#world').style.transform.includes('NaN'));
+ // Template instances retain loose edges and translate free endpoint positions.
+ reset(loose);const template=w.gacchankoDesign.capture(api.graph,['a'],{id:'t',name:'T',instructions:''});assert.equal(template.edges.length,1);
+ let serial=0;const instance=w.gacchankoDesign.instantiate(template,prefix=>prefix+(++serial),{x:30,y:40});assert.equal(instance.edges[0].target,'');assert.equal(instance.edges[0].source,instance.nodes[0].id);assert.equal(instance.edges[0].targetPosition.x,loose.edges[0].targetPosition.x+30);
+ console.log('PASS: blank-drop node creation (both directions, all import choices), atomic undo, metadata preservation, loose endpoint save/reload/reconnect, cancellation, protection and templates');
+ }finally{w.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});

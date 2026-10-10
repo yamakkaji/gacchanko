@@ -52,6 +52,10 @@ struct EdgeAppearance: Codable {
     var size: Double
     var arrows: Bool
 }
+struct EdgePosition: Codable {
+    var x: Double
+    var y: Double
+}
 struct PatchEdge: Codable {
     var id: String
     var source: String
@@ -69,6 +73,8 @@ struct PatchEdge: Codable {
     var path: String? = nil
     var implementationState: String? = nil
     var appearance: EdgeAppearance? = nil
+    var sourcePosition: EdgePosition? = nil
+    var targetPosition: EdgePosition? = nil
 }
 struct GraphTemplate: Codable {
     var id: String
@@ -148,10 +154,18 @@ func validate(_ graph: PatchGraph) throws {
                   Set(e.after).count == e.after.count, e.after.allSatisfy({ $0 != edge.id }) else { throw PatchError("非同期実行設定を確認してください。") }
             guard e.after.allSatisfy({ id in graph.edges.contains(where: { $0.id == id }) }) else { throw PatchError("待機先の接続が見つかりません。") }
         }
-        guard let source = graph.nodes.first(where: { $0.id == edge.source }),
-              let target = graph.nodes.first(where: { $0.id == edge.target }),
-              source.outputs.contains(edge.sourcePort), target.inputs.contains(edge.targetPort),
-              ["data", "request", "event"].contains(edge.mode) else { throw PatchError("接続先またはポートが見つかりません。") }
+        func validateEndpoint(_ id: String, _ port: String, _ position: EdgePosition?, output: Bool) throws {
+            if id.isEmpty {
+                guard port.isEmpty, let position, position.x.isFinite, position.y.isFinite,
+                      abs(position.x) < 1e7, abs(position.y) < 1e7 else { throw PatchError("未接続の端点の位置が不正です。") }
+            } else {
+                guard position == nil, let node = graph.nodes.first(where: { $0.id == id }),
+                      (output ? node.outputs : node.inputs).contains(port) else { throw PatchError("接続先またはポートが見つかりません。") }
+            }
+        }
+        try validateEndpoint(edge.source, edge.sourcePort, edge.sourcePosition, output: true)
+        try validateEndpoint(edge.target, edge.targetPort, edge.targetPosition, output: false)
+        guard ["data", "request", "event"].contains(edge.mode) else { throw PatchError("接続の種類が不正です。") }
     }
     var visiting = Set<String>(), done = Set<String>()
     func visit(_ id: String) throws {
@@ -165,8 +179,14 @@ func validate(_ graph: PatchGraph) throws {
 func fingerprint(_ edge: PatchEdge, _ graph: PatchGraph) throws -> String {
     var nodes = graph.nodes.filter { $0.id == edge.source || $0.id == edge.target }
     for i in nodes.indices { nodes[i].x = 0; nodes[i].y = 0; nodes[i].appearance = nil }
-    var definition = edge; definition.appearance = nil
+    var definition = edge; definition.appearance = nil; definition.sourcePosition = nil; definition.targetPosition = nil
     let payload: [String: Any] = ["edge": try object(definition), "nodes": try nodes.sorted { $0.id < $1.id }.map { try object($0) }, "projectDescription": graph.description]
+    return digest(try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .withoutEscapingSlashes]))
+}
+
+func nodeFingerprint(_ node: PatchNode, _ graph: PatchGraph) throws -> String {
+    var definition = node; definition.x = 0; definition.y = 0; definition.appearance = nil
+    let payload: [String: Any] = ["node": try object(definition), "projectDescription": graph.description]
     return digest(try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .withoutEscapingSlashes]))
 }
 
@@ -245,7 +265,7 @@ final class ProjectStore {
         guard encoded.count < 10_000_000 else { throw PatchError("graph.json が大きすぎます。") }
         if unlocked.isEmpty && checkpointBefore { try history?.checkpoint(actor: "external / unknown", message: "Implementation / report update before design save") }
         // Preflight generated destinations before committing the authoritative graph.
-        for name in ["graph.json", "AGENT_BRIEF.md", "graph.mmd"] + updated.edges.map({ "connections/\($0.id)/SPEC.md" }) { _ = try safeURL(name) }
+        for name in ["graph.json", "AGENT_BRIEF.md", "graph.mmd"] + updated.edges.map({ "connections/\($0.id)/SPEC.md" }) + updated.nodes.map({ "components/nodes/\($0.id)/SPEC.md" }) { _ = try safeURL(name) }
         try write(encoded, to: "graph.json")
         graph = updated; revision = digest(encoded)
         try exportBrief()
@@ -270,6 +290,9 @@ final class ProjectStore {
         - Put integration code under `implementations/<edge-id>/`, and shared integration code under `implementations/shared/`. Preserve source repositories unless the user requests edits.
         - Repositories and URLs are references. A remote URL has not been cloned. Resolve missing paths with the user; never invent APIs, credentials, outputs, or successful tests.
         - Read the specifications for the requested edges in `connections/<edge-id>/SPEC.md`. If the handoff names one edge, implement only that edge; other edges are context unless explicitly requested. Ask only about ambiguities that materially affect behaviour. Request/response edges include the response on the same connection.
+        - When a handoff names a node, implement only that node. Read components/nodes/<node-id>/SPEC.md, put new code in components/nodes/<node-id>/implementation/, and write components/nodes/<node-id>/report.json with that SPEC.md fingerprint and the same report format. Adjacent nodes and edges are context only. Do not modify referenced source repositories unless the user explicitly requests it. This node scope takes precedence over the general connection workflow.
+        - Immutable nodes protect their components/nodes/<node-id>/implementation/ files; request explicit GUI unlock before changing protected code. Node reports remain writable.
+        - Node SPEC.md files are generated; do not edit them directly. Design changes belong in graph.json and await adoption.
         - The graph describes intent; it is not an executable scheduling specification. Define lifecycle, timing, buffering, and failure behaviour in the implementation where required.
         - Write `reports/<edge-id>.json` atomically, using the fingerprint from that edge's SPEC.md. Format: {"fingerprint":"...","status":"implemented|verified|blocked","summary":"...","files":["implementations/<edge-id>/adapter.py"],"checks":["Actual command and result"]}.
         - `verified` means you actually ran relevant checks. For incomplete work use `blocked` and explain what is missing. Do not claim runtime integration has passed from a syntax check alone.
@@ -283,6 +306,7 @@ final class ProjectStore {
         - Project-local graph, generated specifications, implementations and reports are checkpointed to `.gacchanko/history.git`. Referenced repositories are not included. Same-user filesystem writes cannot be sandboxed by this app. Do not bypass protection by editing its history.
         - External graph edits are proposals. The GUI retains the accepted graph until the user selects changes to adopt; rejected and partially adopted proposals are archived locally. Preserve IDs and explain your changes in designInstructions. Do not overwrite a proposal while it is being reviewed.
         - implementationState is user-declared: unspecified / planned / existing / verified. It is not automatic evidence of working code. Inspect references and record actual checks.
+        - An edge may have an unconnected endpoint: its source/target and corresponding port are empty strings, with sourcePosition/targetPosition containing canvas x/y. Such edges retain their identity, intent, metadata and implementation files. Do not delete them or invent endpoints. Resolve missing endpoints before implementation or verification. Positions are layout only.
         - Edge layer is data (payload), control (start target after source completes), or event (trigger per event). Missing layer means data. execution describes a contract for generated code, not a scheduler running inside gacchanko.
         - execution.after lists edge completion dependencies within the SAME run_id and iteration_id. join=all waits for all, any for the first; when any wins, late completions must not trigger the same task again. Dependencies must be acyclic. Roots are activated by explicit start, input or event as described in intent.
         - dispatch=sync awaits completion before the producer proceeds; async queues work and lets the producer proceed. maxConcurrency bounds active invocations per edge; sync uses one. bufferSize bounds pending work; overflow=block applies backpressure, dropOldest/dropNewest drops that pending item. Define cancellation and delivery guarantees in intent. timeoutMs is the task deadline including dependency/queue waits; onError=stop stops the run, continue emits an error result and proceeds. Failed dependencies must be resolved as errors, never waited for indefinitely.
@@ -293,13 +317,43 @@ final class ProjectStore {
 
         """
         for node in graph.nodes {
+            let hash = try nodeFingerprint(node, graph)
+            let specification = """
+            # \(node.name)
+
+            Node ID: \(node.id)
+            Fingerprint: \(hash)
+            Policy: \(node.policy ?? "mutable")
+            Component Type: \(node.kind)
+            Access: \(node.path)
+            Implementation state (user-declared): \(node.implementationState ?? "unspecified")
+            Design instructions: \(node.designInstructions ?? "")
+            Template origin: \(try originDescription(node.derivedFrom, graph))
+            Command (not auto-executed): \(node.command)
+            Inputs: \(node.inputs.joined(separator: ", "))
+            Outputs: \(node.outputs.joined(separator: ", "))
+
+            ## Description
+            \(node.description)
+
+            ## Project goal
+            \(graph.description)
+
+            ## Scope and deliverables
+            Implement or verify only this node. Adjacent edges and nodes are context, not additional implementation targets.
+            Preserve referenced source repositories unless explicitly authorized to edit them.
+            Write new code in components/nodes/\(node.id)/implementation/.
+            Write components/nodes/\(node.id)/report.json with fingerprint \(hash), status implemented|verified|blocked, summary, files, and checks.
+            Report actual checks only. Follow AGENT_BRIEF.md. Do not edit this generated SPEC.md.
+            """
+            try writeText(specification + "\n", to: "components/nodes/\(node.id)/SPEC.md")
             brief += "\n### \(node.name) [\(node.id)]\n- Policy: \(node.policy ?? "mutable")\n- Design instructions: \(node.designInstructions ?? "")\n- Template origin: \(try originDescription(node.derivedFrom, graph))\n- Kind: \(node.kind)\n- Implementation state (user-declared): \(node.implementationState ?? "unspecified")\n- Location: \(node.path.isEmpty ? "Not set" : node.path)\n- Command (not auto-executed): \(node.command)\n- Inputs: \(node.inputs.joined(separator: ", "))\n- Outputs: \(node.outputs.joined(separator: ", "))\n\n\(node.description)\n"
         }
-        brief += "\n## Active connections\n"
+        brief += "\n## Connection components\n"
         for edge in graph.edges {
             let hash = try fingerprint(edge, graph)
-            let source = graph.nodes.first { $0.id == edge.source }!
-            let target = graph.nodes.first { $0.id == edge.target }!
+            let source = graph.nodes.first { $0.id == edge.source }
+            let target = graph.nodes.first { $0.id == edge.target }
             let specification = """
             # \(edge.label.isEmpty ? "Connection" : edge.label)
 
@@ -308,41 +362,48 @@ final class ProjectStore {
             Component Type: \(edge.mode)
             Access: \(edge.path ?? "Not set")
             Implementation state (user-declared): \(edge.implementationState ?? "unspecified")
+            Connection state: \(source == nil || target == nil ? "Unconnected. Preserve this edge and its intent; resolve missing endpoints before implementation or verification." : "Connected")
             Mode: \(edge.mode)
             Layer: \(edge.layer ?? "data")
             Execution: \(try edge.execution.map { String(data: try jsonData($0), encoding: .utf8)! } ?? "Unspecified; agree on scheduling before implementation")
             Policy: \(edge.policy ?? "mutable")
             Design instructions: \(edge.designInstructions ?? "")
             Template origin: \(try originDescription(edge.derivedFrom, graph))
-            Source: \(source.name) [\(source.id)] / \(edge.sourcePort)
-            Source location: \(source.path)
-            Target: \(target.name) [\(target.id)] / \(edge.targetPort)
-            Target location: \(target.path)
+            Source: \(source?.name ?? "Unconnected") [\(source?.id ?? "")] / \(edge.sourcePort)
+            Source location: \(source?.path ?? "")
+            Target: \(target?.name ?? "Unconnected") [\(target?.id ?? "")] / \(edge.targetPort)
+            Target location: \(target?.path ?? "")
 
             ## User intent
             \(edge.intent.isEmpty ? "No intent supplied yet. Clarify the intended behaviour before implementing." : edge.intent)
 
             ## Source context
-            \(source.description)
-            Invocation hint: \(source.command)
+            \(source?.description ?? "")
+            Invocation hint: \(source?.command ?? "")
 
             ## Target context
-            \(target.description)
-            Invocation hint: \(target.command)
+            \(target?.description ?? "")
+            Invocation hint: \(target?.command ?? "")
 
             ## Deliverables
             Implement in implementations/\(edge.id)/. Record actual results in reports/\(edge.id).json.
             Use fingerprint \(hash). Follow AGENT_BRIEF.md. Do not edit this generated file.
             """
             try writeText(specification + "\n", to: "connections/\(edge.id)/SPEC.md")
-            brief += "\n- [\(edge.id)](connections/\(edge.id)/SPEC.md): \(source.name) → \(target.name) — \(edge.label)\n"
+            brief += "\n- [\(edge.id)](connections/\(edge.id)/SPEC.md): \(source?.name ?? "Unconnected") → \(target?.name ?? "Unconnected") — \(edge.label)\n"
         }
         try writeText(brief + "\n", to: "AGENT_BRIEF.md")
         func label(_ text: String) -> String { text.replacingOccurrences(of: "\"", with: "'").replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "[", with: "(").replacingOccurrences(of: "]", with: ")").replacingOccurrences(of: "<", with: "(").replacingOccurrences(of: ">", with: ")").replacingOccurrences(of: "&", with: "+") }
         let nodeKeys = Dictionary(uniqueKeysWithValues: graph.nodes.enumerated().map { ($1.id, "n\($0)") })
         var mermaid = "flowchart TD\n"
         for node in graph.nodes { mermaid += "  \(nodeKeys[node.id]!) [\"\(label(node.name))\"]\n" }
-        for edge in graph.edges { mermaid += "  \(nodeKeys[edge.source]!) \(edge.mode == "request" ? "<-->" : "-->") |\"\(label(edge.label))\"| \(nodeKeys[edge.target]!)\n" }
+        for (index, edge) in graph.edges.enumerated() {
+            let source = nodeKeys[edge.source] ?? "loose\(index)s"
+            let target = nodeKeys[edge.target] ?? "loose\(index)t"
+            if edge.source.isEmpty { mermaid += "  \(source) [\"Unconnected output\"]\n" }
+            if edge.target.isEmpty { mermaid += "  \(target) [\"Unconnected input\"]\n" }
+            mermaid += "  \(source) \(edge.mode == "request" ? "<-->" : "-->") |\"\(label(edge.label))\"| \(target)\n"
+        }
         try writeText(mermaid, to: "graph.mmd")
         for directory in ["implementations", "reports"] { try fm.createDirectory(at: safeURL(directory), withIntermediateDirectories: true) }
     }
@@ -364,7 +425,23 @@ final class ProjectStore {
                 } else { reports[edge.id] = ["status": "blocked", "summary": "レポートの JSON を読み取れません。"] }
             }
         }
-        return ["project": try object(graph), "root": root.path, "revision": revision, "reports": reports, "fingerprints": fingerprints, "history": try history?.summary() ?? [:]]
+        var nodeReports: [String: Any] = [:], nodeFingerprints: [String: String] = [:]
+        for node in graph.nodes {
+            let hash = try nodeFingerprint(node, graph); nodeFingerprints[node.id] = hash
+            let directory = "components/nodes/\(node.id)/"
+            if let url = try? safeURL(directory + "report.json"), let data = try? Data(contentsOf: url), data.count < 1_000_000 {
+                if var report = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+                    let claimed = report["status"] as? String ?? "pending"
+                    report["status"] = ["implemented", "verified", "blocked"].contains(claimed) ? claimed : "pending"
+                    if report["fingerprint"] as? String != hash { report["status"] = "stale" }
+                    if history?.protectedFiles.contains(where: { $0.hasPrefix(directory + "implementation/") }) == true {
+                        report["status"] = "blocked"; report["summary"] = "保護されたノード実装への外部変更を検出しました。"
+                    }
+                    nodeReports[node.id] = report
+                } else { nodeReports[node.id] = ["status": "blocked", "summary": "レポートの JSON を読み取れません。"] }
+            }
+        }
+        return ["project": try object(graph), "root": root.path, "revision": revision, "reports": reports, "fingerprints": fingerprints, "nodeReports": nodeReports, "nodeFingerprints": nodeFingerprints, "history": try history?.summary() ?? [:]]
     }
     func poll() throws -> [String: Any] {
         guard let root else { return ["project": NSNull()] }
@@ -374,8 +451,24 @@ final class ProjectStore {
         try history?.checkpoint(actor: "external / unknown", message: "Implementation / report update")
         return try snapshot()
     }
-    func prompt(edgeID: String?) throws -> String {
+    func prompt(edgeID: String?, nodeID: String? = nil) throws -> String {
         guard let root else { throw PatchError("先にプロジェクトを保存してください。") }
+        if let nodeID {
+            guard edgeID == nil, let node = graph?.nodes.first(where: { $0.id == nodeID }) else { throw PatchError("対象のノードが見つからないか、対象指定が重複しています。") }
+            let directory = root.appendingPathComponent("components/nodes/\(nodeID)")
+            return """
+            次のノードコンポーネントだけを実装・検証してください。
+            対象: \(node.name) [\(nodeID)]
+            \(root.appendingPathComponent("AGENT_BRIEF.md").path)
+            \(root.appendingPathComponent("graph.json").path)
+            \(directory.appendingPathComponent("SPEC.md").path)
+
+            接続されたノードやエッジは文脈として参照し、今回の実装対象には含めないでください。
+            参照先のコードを確認し、新しい実装は \(directory.appendingPathComponent("implementation").path) に保存してください。
+            参照先リポジトリの変更や保護解除を勝手に行わないでください。
+            実際の検証結果を \(directory.appendingPathComponent("report.json").path) に、SPEC.mdのfingerprint、status、summary、files、checksを含めて記録してください。
+            """
+        }
         var text = "次のローカルプロジェクトを読んで、設計グラフに沿った接続コードを実装してください。\n\n\(root.appendingPathComponent("AGENT_BRIEF.md").path)\n\(root.appendingPathComponent("graph.json").path)\n\n"
         if let id = edgeID, graph?.edges.contains(where: { $0.id == id }) == true {
             text += "今回の対象は接続 \(id) です。仕様は \(root.appendingPathComponent("connections/\(id)/SPEC.md").path) にあります。\n"
@@ -526,7 +619,7 @@ final class ProjectHistory {
     }
     func trackedFiles() throws -> [String] {
         var files: [String] = []
-        for name in ["graph.json", "AGENT_BRIEF.md", "graph.mmd", "connections", "implementations", "reports"] {
+        for name in ["graph.json", "AGENT_BRIEF.md", "graph.mmd", "connections", "implementations", "reports", "components"] {
             let url = root.appendingPathComponent(name)
             guard fm.fileExists(atPath: url.path) else { continue }
             let resourceKeys: [URLResourceKey] = [.isSymbolicLinkKey, .isRegularFileKey, .isDirectoryKey, .fileSizeKey]
@@ -551,7 +644,8 @@ final class ProjectHistory {
     }
     func codeViolations(unlocked: Set<String> = []) throws -> [String] {
         guard let baseline = try acceptedGraph() else { return [] }
-        let scopes = baseline.edges.filter { protected($0.policy) && !unlocked.contains("edge:" + $0.id) }.map { "implementations/" + $0.id + "/" }
+        var scopes = baseline.edges.filter { protected($0.policy) && !unlocked.contains("edge:" + $0.id) }.map { "implementations/" + $0.id + "/" }
+        scopes += baseline.nodes.filter { protected($0.policy) && !unlocked.contains("node:" + $0.id) }.map { "components/nodes/" + $0.id + "/implementation/" }
         if scopes.isEmpty { return [] }
         let baselineFiles = Set(try git(["ls-tree", "-r", "--name-only", "HEAD", "--"] + scopes).split(separator: "\n").map(String.init))
         let current = try trackedFiles().filter { file in scopes.contains { file.hasPrefix($0) } }
@@ -596,7 +690,7 @@ final class ProjectHistory {
         guard ref.range(of: "^[0-9a-f]{40}$", options: .regularExpression) != nil,
               let graph = try acceptedGraph(ref) else { throw PatchError("履歴の版が見つかりません。") }
         return ["id": ref, "changes": try designChanges(acceptedGraph(ref + "^"), graph), "files": try changedFiles(ref),
-                "diff": try git(["show", "--format=fuller", "--no-ext-diff", "--no-textconv", "--no-renames", "--stat", "--patch", ref, "--", "graph.json", "implementations", "reports"])]
+                "diff": try git(["show", "--format=fuller", "--no-ext-diff", "--no-textconv", "--no-renames", "--stat", "--patch", ref, "--", "graph.json", "implementations", "reports", "components"])]
     }
 }
 

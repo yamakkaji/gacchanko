@@ -21,6 +21,41 @@ func runSelfTests() throws {
     try check(try String(contentsOf: store.root!.appendingPathComponent("AGENT_BRIEF.md"), encoding: .utf8).contains("implement only that edge"), "single-edge handoff scope is explicit")
     let reader = ProjectStore(); _ = try reader.open(store.root!)
     try check(reader.graph?.edges.first?.intent == "Convert JSON", "graph round trip")
+    // Unconnected edges are persisted components, not invalid references.
+    let looseStore = ProjectStore()
+    var looseGraph = graph
+    _ = try looseStore.create(temp.appendingPathComponent("loose"), graph: looseGraph)
+    try looseStore.writeText("keep implementation", to: "implementations/e1/adapter.py")
+    try looseStore.write(JSONSerialization.data(withJSONObject: ["fingerprint": try fingerprint(edge, graph), "status": "verified"]), to: "reports/e1.json")
+    looseGraph.edges[0].target = ""; looseGraph.edges[0].targetPort = ""
+    looseGraph.edges[0].targetPosition = EdgePosition(x: 650, y: 550)
+    _ = try looseStore.save(looseGraph, expectedRevision: looseStore.revision)
+    let looseReader = ProjectStore(); _ = try looseReader.open(looseStore.root!)
+    try check(looseReader.graph?.edges[0].targetPosition?.x == 650 && looseReader.graph?.edges[0].intent == edge.intent, "loose endpoint and intent survive save and reopen")
+    try check(try String(contentsOf: looseStore.root!.appendingPathComponent("implementations/e1/adapter.py"), encoding: .utf8) == "keep implementation", "detaching preserves implementation files")
+    let looseReports = try looseReader.snapshot()["reports"] as! [String: [String: Any]]
+    try check(looseReports["e1"]?["status"] as? String == "stale", "detaching invalidates existing report")
+    try check(try String(contentsOf: looseStore.root!.appendingPathComponent("connections/e1/SPEC.md"), encoding: .utf8).contains("Unconnected. Preserve this edge"), "loose edge spec explicitly preserves intent and asks to resolve endpoints")
+    try check(try String(contentsOf: looseStore.root!.appendingPathComponent("graph.mmd"), encoding: .utf8).contains("Unconnected input"), "Mermaid export includes loose endpoint")
+    let looseHash = try fingerprint(looseGraph.edges[0], looseGraph)
+    looseGraph.edges[0].targetPosition?.x += 80
+    try check(try fingerprint(looseGraph.edges[0], looseGraph) == looseHash, "loose endpoint layout is excluded from fingerprint")
+    looseGraph.edges[0].source = ""; looseGraph.edges[0].sourcePort = ""
+    looseGraph.edges[0].sourcePosition = EdgePosition(x: 200, y: 250)
+    _ = try looseStore.save(looseGraph, expectedRevision: looseStore.revision)
+    _ = try looseReader.open(looseStore.root!)
+    try check(looseReader.graph?.edges[0].source == "" && looseReader.graph?.edges[0].target == "", "edge can persist with both ends unconnected")
+    looseGraph.edges[0] = edge
+    _ = try looseStore.save(looseGraph, expectedRevision: looseStore.revision)
+    try check(looseStore.graph?.edges[0].target == "n2" && looseStore.graph?.edges[0].targetPosition == nil, "reconnecting returns to ordinary edge representation")
+    var malformed = graph; malformed.edges[0].target = "missing"
+    try rejects("unknown node reference still rejected") { try validate(malformed) }
+    malformed.edges[0].target = ""; malformed.edges[0].targetPort = ""
+    try rejects("loose endpoint requires explicit position") { try validate(malformed) }
+    malformed.edges[0].targetPosition = EdgePosition(x: .infinity, y: 0)
+    try rejects("nonfinite loose position rejected") { try validate(malformed) }
+    malformed = graph; malformed.edges[0].targetPosition = EdgePosition(x: 0, y: 0)
+    try rejects("connected endpoint cannot carry a loose position") { try validate(malformed) }
     let originalHash = try fingerprint(edge, graph)
     graph.nodes[0].x = 123
     try check(try fingerprint(edge, graph) == originalHash, "layout does not invalidate implementation")
@@ -193,5 +228,39 @@ func runSelfTests() throws {
     try rejects("proposal adoption cannot bypass immutable") { _ = try workflowStore.adoptExternal(diskRevision: digest(try jsonData(proposal)), selections: ["node:n1"]) }
     _ = try workflowStore.adoptExternal(diskRevision: digest(try jsonData(proposal)), selections: ["node:n2"])
     try check(workflowStore.graph!.nodes[0].description == lockedFlow.nodes[0].description && workflowStore.graph!.nodes[1].description == "Safe change", "safe subset of a protection-violating proposal can be adopted")
+    // Node-only handoffs and reports have their own scope, independent of edges.
+    let nodeStore = ProjectStore()
+    var nodeGraph = PatchGraph(schemaVersion: 1, name: "Node-only", description: "Build the component", nodes: [node], edges: [])
+    _ = try nodeStore.create(temp.appendingPathComponent("node-only"), graph: nodeGraph)
+    let nodeSpec = try String(contentsOf: nodeStore.root!.appendingPathComponent("components/nodes/n1/SPEC.md"), encoding: .utf8)
+    let nodeHash = try nodeFingerprint(node, nodeGraph)
+    try check(nodeSpec.contains(nodeHash) && nodeSpec.contains("Implement or verify only this node"), "node-specific specification exported")
+    let nodePrompt = try nodeStore.prompt(edgeID: nil, nodeID: "n1")
+    try check(nodePrompt.contains("対象: Source [n1]") && nodePrompt.contains("components/nodes/n1/report.json") && nodePrompt.contains("今回の実装対象には含めない"), "node handoff targets only selected node, including isolated nodes")
+    try rejects("unknown node handoff rejected") { _ = try nodeStore.prompt(edgeID: nil, nodeID: "missing") }
+    try rejects("ambiguous node and edge handoff rejected") { _ = try nodeStore.prompt(edgeID: "e1", nodeID: "n1") }
+    let nodeReport: [String: Any] = ["fingerprint": nodeHash, "status": "verified", "summary": "Node tested", "files": [], "checks": ["Node check"]]
+    try nodeStore.write(JSONSerialization.data(withJSONObject: nodeReport), to: "components/nodes/n1/report.json")
+    let nodeSnapshot = try nodeStore.poll()
+    try check((nodeSnapshot["nodeReports"] as? [String: [String: Any]])?["n1"]?["status"] as? String == "verified", "node report loaded through polling")
+    try check((nodeSnapshot["reports"] as? [String: Any])?.isEmpty == true, "node report is not mistaken for an edge report")
+    nodeGraph.nodes[0].x = 200
+    nodeGraph.nodes[0].appearance = NodeAppearance(color: "#123456", radius: 8, corners: "uniform", surface: "filled", header: "plain")
+    try check(try nodeFingerprint(nodeGraph.nodes[0], nodeGraph) == nodeHash, "node layout and appearance preserve report fingerprint")
+    nodeGraph.nodes[0].command = "python component.py"
+    let nodeChanged = try nodeStore.save(nodeGraph, expectedRevision: nodeStore.revision)
+    try check((nodeChanged["nodeReports"] as? [String: [String: Any]])?["n1"]?["status"] as? String == "stale", "node detail edit invalidates report")
+    try nodeStore.writeText("original", to: "components/nodes/n1/implementation/main.py")
+    _ = try nodeStore.poll()
+    nodeGraph.nodes[0].policy = "immutable"
+    _ = try nodeStore.save(nodeGraph, expectedRevision: nodeStore.revision)
+    try nodeStore.writeText("external change", to: "components/nodes/n1/implementation/main.py")
+    let blockedNode = try nodeStore.poll()
+    try check((blockedNode["nodeReports"] as? [String: [String: Any]])?["n1"]?["status"] as? String == "blocked", "protected node implementation changes block report and checkpoint")
+    try check(nodeStore.history!.protectedFiles.contains("components/nodes/n1/implementation/main.py"), "protected node code change is visible in history")
+    _ = try nodeStore.unlock(kind: "node", id: "n1", expectedRevision: nodeStore.revision)
+    nodeGraph = nodeStore.graph!; nodeGraph.nodes = []
+    _ = try nodeStore.save(nodeGraph, expectedRevision: nodeStore.revision)
+    try check(fm.fileExists(atPath: nodeStore.root!.appendingPathComponent("components/nodes/n1/implementation/main.py").path), "deleting a node preserves its implementation")
     print("\(count) core checks passed")
 }

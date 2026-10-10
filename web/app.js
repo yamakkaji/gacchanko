@@ -17,7 +17,7 @@ let nodeAppearanceExpanded=false;
 let viewportFrame=0, edgeZoomTimer, renderedEdgeZoom=1;
 const call = (command, args={}) => host.request(command,args);
 const emptyGraph = () => ({schemaVersion:1,name:'Untitled project',description:'',nodes:[],edges:[]});
-let graph=emptyGraph(), root='', revision='', reports={}, fingerprints={}, dirty=false, selected=null;
+let graph=emptyGraph(), root='', revision='', reports={}, fingerprints={}, nodeReports={}, nodeFingerprints={}, dirty=false, selected=null;
 let spacePressed=false;
 let view={x:65,y:65,zoom:1}, connecting=null, drag=null, undoStack=[], redoStack=[], editSerial=0;
 let saveTimer, toastTimer, saveTask=null, external=false, inspectorKey='', draftBackupError=false;
@@ -42,7 +42,7 @@ function markDirty() {
 }
 function cleanState(state,{replace=true}={}) {
   if(replace){clearConnection(false);graph=state.project;selected=null;undoStack=[];redoStack=[];}
-  root=state.root;revision=state.revision;reports=state.reports||{};fingerprints=state.fingerprints||{};dirty=false;external=false;
+  root=state.root;revision=state.revision;reports=state.reports||{};fingerprints=state.fingerprints||{};nodeReports=state.nodeReports||{};nodeFingerprints=state.nodeFingerprints||{};dirty=false;external=false;
   savedGraph=clone(state.project);historyState=state.history||{};changeOverlay=null;overlayFiles=null;pendingExternal=state.pendingExternal||null;external=!!pendingExternal;updateExternalBanner(); call('dirty',{value:false}).catch(()=>{});
   try {localStorage.removeItem('gacchanko-draft');}catch{}
   render(true);
@@ -59,7 +59,7 @@ async function save(interactive=true) {
   try {
     const state=await saveTask;
     if(!state)return false;
-    root=state.root;revision=state.revision;reports=state.reports||{};fingerprints=state.fingerprints||{};
+    root=state.root;revision=state.revision;reports=state.reports||{};fingerprints=state.fingerprints||{};nodeReports=state.nodeReports||{};nodeFingerprints=state.nodeFingerprints||{};
     if(serial===editSerial){dirty=false;call('dirty',{value:false}).catch(()=>{});try{localStorage.removeItem('gacchanko-draft');}catch{}}
     else {dirty=true;call('dirty',{value:true}).catch(()=>{});saveTimer=setTimeout(()=>save(false).catch(e=>toast(e.message,true)),100);}
     savedGraph=clone(outgoing);historyState=state.history||{};changeOverlay=null;overlayFiles=null;applyChangeOverlay();updateHeader();if(wasNew)renderInspector(true);return true;
@@ -78,6 +78,7 @@ function updateHeader(){
 function status(id){return reports[id]?.status||'pending';}
 function nodeHeight(n){return 86+Math.max(n.inputs.length,n.outputs.length,1)*27;}
 function portPoint(nodeID,port,direction){const n=graph.nodes.find(n=>n.id===nodeID);if(!n)return {x:0,y:0};const index=Math.max(0,(direction==='out'?n.outputs:n.inputs).indexOf(port));return{x:n.x+(direction==='out'?224:0),y:n.y+85+index*27+13.5};}
+function edgePoint(edge,end){return edge[end]?portPoint(edge[end],edge[end+'Port'],end==='source'?'out':'in'):edge[end+'Position'];}
 function curve(a,b,route={}){return appearance.geometry(a,b,route).d;}
 function edgeRoute(source,target,id){
   if(source!==target)return {};
@@ -107,11 +108,12 @@ function beginDrag(event,state){
 function renderEdges(){
   clearTimeout(edgeZoomTimer);renderedEdgeZoom=view.zoom;
   $('#edge-paths').innerHTML=graph.edges.filter(e=>edgeLayerFilter==='all'||(e.layer||'data')===edgeLayerFilter).map((e,index)=>{
-    const a=portPoint(e.source,e.sourcePort,'out'),b=portPoint(e.target,e.targetPort,'in');
-    const route=edgeRoute(e.source,e.target,e.id),geometry=appearance.geometry(a,b,route),mid=geometry.point(.5),x=mid.x,y=mid.y, label=((e.layer||'data')==='control'?'▶ ':e.layer==='event'?'ϟ ':'')+(e.execution?.dispatch==='async'?'⇢ ':'')+(design.locked(e)?(e.policy==='template'?'◇ ':'🔒 '):e.derivedFrom?'↳ ':'')+(e.mode==='request'?'↔ ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
+    const a=edgePoint(e,'source'),b=edgePoint(e,'target');
+    const route=edgeRoute(e.source,e.target,e.id),geometry=appearance.geometry(a,b,route),mid=geometry.point(.5),x=mid.x,y=mid.y, label=((e.layer||'data')==='control'?'▶ ':e.layer==='event'?'ϟ ':'')+(e.execution?.dispatch==='async'?'⇢ ':'')+(design.locked(e)?(e.policy==='template'?'◇ ':'🔒 '):e.derivedFrom?'↳ ':'')+(e.mode==='request'?'↔ ':'')+(!e.source||!e.target?'未接続 · ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
     const colour={verified:'#416762',implemented:'#715669',stale:'#9a6a23',blocked:'#a54844'}[status(e.id)]||'#486080';
     return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-layer="${esc(e.layer||'data')}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${geometry.d}"/>${appearance.render(a,b,{...route,geometry,settings:e.appearance||edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
-  }).join('')+connectionPreview();
+  }).join('')+graph.edges.filter(e=>edgeLayerFilter==='all'||(e.layer||'data')===edgeLayerFilter).flatMap(e=>['source','target'].filter(end=>!e[end]).map(end=>{const p=edgePoint(e,end);return `<circle class="edge-loose-end" data-loose-edge="${esc(e.id)}" data-loose-end="${end}" cx="${p.x}" cy="${p.y}" r="${7/view.zoom}" vector-effect="non-scaling-stroke"><title>未接続 · ドラッグして接続</title></circle>`;})).join('')+connectionPreview();
+  $$('[data-loose-edge]').forEach(el=>el.addEventListener('pointerdown',event=>{if(event.button!==0||spacePressed||drag)return;event.preventDefault();event.stopPropagation();beginConnection(event,el.dataset.looseEnd,graph.edges.find(e=>e.id===el.dataset.looseEdge));}));
   $$('.edge-group').forEach(el=>{
     el.classList.toggle('reconnecting',connecting?.edgeID===el.dataset.edge);
     el.addEventListener('pointerdown',e=>{if(e.button!==0||spacePressed)return;e.stopPropagation();e.preventDefault();if(connecting)clearConnection();$('#canvas').focus({preventScroll:true});select('edge',el.dataset.edge);});
@@ -149,7 +151,7 @@ function renderList(){
   $('#node-list').innerHTML=graph.nodes.map(n=>`<button class="node-item ${selectedNodeIDs().includes(n.id)?'active':''}" data-select-node="${esc(n.id)}"><span class="node-mini">${symbols[n.kind]||'◇'}</span><span class="item-name">${esc(n.name)}</span><span class="item-state" style="background:${n.path?'#86b39c':'#887656'}"></span></button>`).join('');
   $$('[data-select-node]').forEach(b=>b.onclick=e=>{if(e.shiftKey){toggleNode(b.dataset.selectNode);return;}select('node',b.dataset.selectNode);const n=graph.nodes.find(n=>n.id===b.dataset.selectNode);const r=$('#canvas').getBoundingClientRect();view.x=r.width/2-(n.x+112)*view.zoom;view.y=r.height/2-(n.y+70)*view.zoom;transform();});
 }
-function render(inspector=true){if(selected?.type==='node'||selected?.type==='nodes')setNodeSelection(selectedNodeIDs());updateHeader();renderNodes();renderEdges();renderList();$('#empty-state').hidden=!!graph.nodes.length;transform();if(inspector)renderInspector(true);applyCheckHighlights();}
+function render(inspector=true){if(selected?.type==='node'||selected?.type==='nodes')setNodeSelection(selectedNodeIDs());updateHeader();renderNodes();renderEdges();renderList();$('#empty-state').hidden=!!(graph.nodes.length||graph.edges.length);transform();if(inspector)renderInspector(true);applyCheckHighlights();}
 function select(type,id,redraw=true){selected={type,id};if(redraw)render(false);refreshSelection();}
 function transform(){
   $('#world').style.transform=`translate(${view.x}px,${view.y}px) scale(${view.zoom})`;
@@ -165,7 +167,7 @@ function scheduleTransform(){
   if(!viewportFrame)viewportFrame=requestAnimationFrame(()=>{viewportFrame=0;transform();});
 }
 function canvasPoint(clientX,clientY){const r=$('#canvas').getBoundingClientRect();return{x:(clientX-r.left-view.x)/view.zoom,y:(clientY-r.top-view.y)/view.zoom};}
-function fit(){if(!graph.nodes.length){view={x:65,y:65,zoom:1};transform();return;}const r=$('#canvas').getBoundingClientRect();const edgePoints=graph.edges.flatMap(e=>appearance.geometry(portPoint(e.source,e.sourcePort,'out'),portPoint(e.target,e.targetPort,'in'),edgeRoute(e.source,e.target,e.id)).samples);const minX=Math.min(...graph.nodes.map(n=>n.x),...edgePoints.map(p=>p.x-40)),minY=Math.min(...graph.nodes.map(n=>n.y),...edgePoints.map(p=>p.y-40)),maxX=Math.max(...graph.nodes.map(n=>n.x+224),...edgePoints.map(p=>p.x+40)),maxY=Math.max(...graph.nodes.map(n=>n.y+nodeHeight(n)),...edgePoints.map(p=>p.y+40));
+function fit(){if(!graph.nodes.length&&!graph.edges.length){view={x:65,y:65,zoom:1};transform();return;}const r=$('#canvas').getBoundingClientRect();const edgePoints=graph.edges.flatMap(e=>appearance.geometry(edgePoint(e,'source'),edgePoint(e,'target'),edgeRoute(e.source,e.target,e.id)).samples);const minX=Math.min(...graph.nodes.map(n=>n.x),...edgePoints.map(p=>p.x-40)),minY=Math.min(...graph.nodes.map(n=>n.y),...edgePoints.map(p=>p.y-40)),maxX=Math.max(...graph.nodes.map(n=>n.x+224),...edgePoints.map(p=>p.x+40)),maxY=Math.max(...graph.nodes.map(n=>n.y+nodeHeight(n)),...edgePoints.map(p=>p.y+40));
   const zoom=Math.min(1.1,Math.max(.25,Math.min((r.width-100)/(maxX-minX),(r.height-130)/(maxY-minY))));view={zoom,x:(r.width-(maxX-minX)*zoom)/2-minX*zoom,y:(r.height-(maxY-minY)*zoom)/2-minY*zoom-12};transform();}
 function zoomBy(factor,cx,cy,defer=false){const r=$('#canvas').getBoundingClientRect();const x=cx??r.left+r.width/2,y=cy??r.top+r.height/2;const p=canvasPoint(x,y);view.zoom=Math.max(.2,Math.min(2.5,view.zoom*factor));view.x=x-r.left-p.x*view.zoom;view.y=y-r.top-p.y*view.zoom;defer?scheduleTransform():transform();}
 function movingDirection(){return connecting?.moving==='source'?'out':'in';}
@@ -181,7 +183,7 @@ function validCandidate(candidate){
   const old=graph.edges.find(e=>e.id===connecting.edgeID);
   if(old&&(design.locked(old)||graph.nodes.some(n=>[old.source,old.target].includes(n.id)&&design.locked(n)))&&Object.keys(next).some(k=>next[k]!==old[k]))return false;
   const layer=old?.layer|| (old?'data':edgeLayerFilter==='all'?'data':edgeLayerFilter);
-  return !graph.edges.some(e=>(e.layer||'data')===layer&&e.id!==connecting.edgeID&&e.source===next.source&&e.target===next.target&&e.sourcePort===next.sourcePort&&e.targetPort===next.targetPort);
+  return !next.source||!next.target||!graph.edges.some(e=>(e.layer||'data')===layer&&e.id!==connecting.edgeID&&e.source===next.source&&e.target===next.target&&e.sourcePort===next.sourcePort&&e.targetPort===next.targetPort);
 }
 function nearestPort(clientX,clientY){
   if(!connecting)return null;
@@ -207,8 +209,9 @@ function updatePortStates(){
 function beginConnection(event,moving,edge=null,port=null){
   if(edge&&(design.locked(edge)||graph.nodes.some(n=>[edge.source,edge.target].includes(n.id)&&design.locked(n)))){toast('保護された接続です。付け替えるには保護を解除してください。',true);return;}
   clearConnection(false);
-  const fixed=edge?(moving==='target'?{node:edge.source,port:edge.sourcePort,direction:'out'}:{node:edge.target,port:edge.targetPort,direction:'in'}):port;
-  const point=edge?portPoint(moving==='target'?edge.target:edge.source,moving==='target'?edge.targetPort:edge.sourcePort,moving==='target'?'in':'out'):portPoint(port.node,port.port,port.direction);
+  const fixedEnd=moving==='target'?'source':'target';
+  const fixed=edge?{node:edge[fixedEnd],port:edge[fixedEnd+'Port'],direction:fixedEnd==='source'?'out':'in',point:edgePoint(edge,fixedEnd)}:port;
+  const point=edge?edgePoint(edge,moving):portPoint(port.node,port.port,port.direction);
   if(edge)selected={type:'edge',id:edge.id};
   connecting={moving,fixed,edgeID:edge?.id,point,candidate:null,pointerID:event.pointerId,held:true,moved:false,startX:event.clientX,startY:event.clientY};
   $('#canvas').focus({preventScroll:true});
@@ -231,24 +234,24 @@ function updateConnection(event){
 }
 function completeConnection(candidate){
   if(!validCandidate(candidate)){clearConnection();return;}
-  const next=connectionEndpoints(candidate),edgeID=connecting.edgeID;
+  const next=connectionEndpoints(candidate),edgeID=connecting.edgeID,moving=connecting.moving;
   clearConnection(false);
   if(edgeID){
     const edge=graph.edges.find(e=>e.id===edgeID);
     if(!edge||Object.keys(next).every(key=>edge[key]===next[key])){renderEdges();return;}
-    mutate(()=>{Object.assign(edge,next);invalidateEdges(null,edgeID);selected={type:'edge',id:edgeID};});
+    mutate(()=>{Object.assign(edge,next);delete edge[moving+'Position'];invalidateEdges(null,edgeID);selected={type:'edge',id:edgeID};});
   }else createConnection(next.source,next.target,next.sourcePort,next.targetPort);
 }
 function connectionPreview(){
   if(!connecting)return '';
-  const c=connecting,p=portPoint(c.fixed.node,c.fixed.port,c.fixed.direction),a=c.moving==='source'?c.point:p,b=c.moving==='target'?c.point:p;
+  const c=connecting,p=c.fixed.point||portPoint(c.fixed.node,c.fixed.port,c.fixed.direction),a=c.moving==='source'?c.point:p,b=c.moving==='target'?c.point:p;
   const route=c.candidate?edgeRoute(c.fixed.node,c.candidate.node,c.edgeID):{};
   return `<g class="connection-preview ${c.candidate?'snapped':''}"><path class="edge-line" d="${curve(a,b,route)}" ${c.candidate?'':'stroke-dasharray="5 4"'}/>${c.candidate?`<circle class="snap-ring" cx="${c.point.x}" cy="${c.point.y}" r="${11/view.zoom}" vector-effect="non-scaling-stroke"/>`:''}</g>`;
 }
 function renderConnectionHandles(){
   const edge=selected?.type==='edge'?graph.edges.find(e=>e.id===selected.id):null;
   $('#edge-handles').innerHTML=!edge||(edgeLayerFilter!=='all'&&(edge.layer||'data')!==edgeLayerFilter)||design.locked(edge)||graph.nodes.some(n=>[edge.source,edge.target].includes(n.id)&&design.locked(n))||connecting?'':['source','target'].map(end=>{
-    const point=portPoint(edge[end],edge[end+'Port'],end==='source'?'out':'in');
+    const point=edgePoint(edge,end);
     return `<circle class="edge-endpoint" data-reconnect="${end}" cx="${point.x}" cy="${point.y}" r="${7/view.zoom}" vector-effect="non-scaling-stroke"><title>${end==='source'?'出力':'入力'}側を付け替え</title></circle>`;
   }).join('');
   $$('[data-reconnect]').forEach(el=>el.addEventListener('pointerdown',event=>{
@@ -263,7 +266,7 @@ function createConnection(source,target,sourcePort,targetPort){
   mutate(()=>{graph.edges.push(edge);selected={type:'edge',id:edge.id};});
   renderInspector(true);setTimeout(()=>$('#edge-intent')?.focus(),30);
 }
-function invalidateEdges(nodeID,edgeID){for(const e of graph.edges){if((edgeID&&e.id===edgeID)||(nodeID&&(e.source===nodeID||e.target===nodeID))){if(reports[e.id])reports[e.id]={...reports[e.id],status:'stale'};}}}
+function invalidateEdges(nodeID,edgeID){if(nodeID&&nodeReports[nodeID])nodeReports[nodeID]={...nodeReports[nodeID],status:'stale'};for(const e of graph.edges){if((edgeID&&e.id===edgeID)||(nodeID&&(e.source===nodeID||e.target===nodeID))){if(reports[e.id])reports[e.id]={...reports[e.id],status:'stale'};}}}
 function makeNode(values={},point){const r=$('#canvas').getBoundingClientRect();const pos=point||canvasPoint(r.left+r.width/2-112,r.top+r.height/2-70);return{id:uid('node'),name:'New component',path:'',kind:'directory',description:'',command:'',inputs:['in'],outputs:['out'],policy:'mutable',designInstructions:'',implementationState:'planned',x:pos.x,y:pos.y,...values};}
 async function addPaths(paths,position){const values=[];for(const path of paths){try{values.push(await call('inspect',{path}));}catch(e){toast(e.message,true);}}
   if(!values.length)return;
@@ -294,7 +297,7 @@ function renderInspector(force=false){
   }else{
     panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">PROJECT OVERVIEW</span></div>${field('プロジェクト名','project-name',graph.name)}${field('全体で実現したいこと','project-description',graph.description,{textarea:true})}${root?`<p class="artifact" style="margin-top:20px">${esc(root)}</p><button class="wide-button" id="copy-location">プロジェクトのパスをコピー</button>`:''}`;
     bindText('project-name',()=>graph.name,value=>{graph.name=value;},true);
-    bindText('project-description',()=>graph.description,value=>{graph.description=value;for(const id in reports)reports[id]={...reports[id],status:'stale'};});
+    bindText('project-description',()=>graph.description,value=>{graph.description=value;for(const id in reports)reports[id]={...reports[id],status:'stale'};for(const id in nodeReports)nodeReports[id]={...nodeReports[id],status:'stale'};});
     if($('#copy-location'))$('#copy-location').onclick=safe(async()=>{await call('copy',{text:root});toast('パスをコピーしました。');});
   }
   if($('#delete-selected'))$('#delete-selected').onclick=safe(deleteSelected);
@@ -307,8 +310,8 @@ function renderInspector(force=false){
   }
 }
 function renderComponentInspector(kind,item){
-  const isNode=kind==='node',locked=design.locked(item),report=isNode?null:reports[item.id];
-  const state=item.implementationState??(!isNode&&['implemented','verified'].includes(report?.status)?'existing':'planned');
+  const isNode=kind==='node',locked=design.locked(item),report=(isNode?nodeReports:reports)[item.id];
+  const state=item.implementationState??(['implemented','verified'].includes(report?.status)?'existing':'planned');
   const name=isNode?'name':'label',description=isNode?'description':'intent',type=isNode?'kind':'mode';
   const types=isNode?Object.fromEntries(Object.keys(symbols).map(k=>[k,k])):{data:'data',request:'request / response',event:'event'};
   const options=(values,current)=>Object.entries(values).map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(label)}</option>`).join('');
@@ -326,12 +329,34 @@ function renderComponentInspector(kind,item){
   $('#set-component-path').onclick=safe(async()=>{const paths=await call('chooseNodes');if(paths.length){const value=await call('inspect',{path:paths[0]});mutate(()=>{item.path=value.path;if(!item[description])item[description]=value.description;invalidate();});}});
   if(!isNode){
     const a=graph.nodes.find(n=>n.id===item.source),b=graph.nodes.find(n=>n.id===item.target);
-    panel.insertAdjacentHTML('beforeend',`<p class="subtle">${esc(a.name)} ${item.mode==='request'?'↔':'→'} ${esc(b.name)}</p><button class="primary wide-button" id="edge-handoff">↗ このコンポーネントをエージェントに渡す</button><button class="wide-button" id="edge-details">接続の詳細…</button><div class="status-card ${status(item.id)}"><strong>実装レポート · ${report?statusNames[status(item.id)]:'未報告'}</strong>${report?.summary?`<p>${esc(report.summary)}</p>`:''}</div>${report?`<details class="report-checks"><summary>エージェントの確認記録</summary><pre class="artifact">${[...(report.checks||[]),...(report.files||[])].map(v=>esc(v)).join('\n')}</pre></details>`:''}`);
-    $('#edge-handoff').onclick=safe(()=>handoff(item.id));$('#edge-details').onclick=()=>openEdgeDetails(item);
+    panel.insertAdjacentHTML('beforeend',`<p class="subtle">${esc(a?.name||'未接続')} ${item.mode==='request'?'↔':'→'} ${esc(b?.name||'未接続')}</p>`);
   }
+  const reportStatus=report?.status||'pending';
+  panel.insertAdjacentHTML('beforeend',`<button class="primary wide-button" id="${kind}-handoff">↗ このコンポーネントをエージェントに渡す</button><button class="wide-button" id="${kind}-details">${isNode?'ノード':'接続'}の詳細…</button><div class="status-card ${esc(reportStatus)}"><strong>実装レポート · ${report?statusNames[reportStatus]||'確認が必要':'未報告'}</strong>${report?.summary?`<p>${esc(report.summary)}</p>`:''}</div>${report?`<details class="report-checks"><summary>エージェントの確認記録</summary><pre class="artifact">${[...(Array.isArray(report.checks)?report.checks:[]),...(Array.isArray(report.files)?report.files:[])].map(v=>esc(v)).join('\n')}</pre></details>`:''}`);
+  $('#'+kind+'-handoff').onclick=safe(()=>isNode?handoffNode(item.id):handoff(item.id));
+  $('#'+kind+'-details').onclick=()=>isNode?openNodeDetails(item):openEdgeDetails(item);
   panel.insertAdjacentHTML('beforeend','<div class="component-actions"><button id="capture-template">原型に登録</button><button class="danger" id="delete-selected">削除</button></div>');
   $('#capture-template').onclick=()=>captureTemplateDialog(isNode?[item.id]:[item.source,item.target],item.policy==='template');
   if(locked)for(const control of $$('input,textarea,select,#set-component-path,#delete-selected',panel))if(control.id!=='design-policy')control.disabled=true;
+}
+function openNodeDetails(item){
+  modal(`<h2>ノードの詳細</h2><div id="node-details-content">${field('設計指示 / variantでの差異','design-instructions',item.designInstructions||'',{textarea:true})}${field('起動・呼び出し方法','node-command',item.command)}${field('入力ポート','node-inputs',item.inputs.join(', '),{hint:'カンマ区切り'})}${field('出力ポート','node-outputs',item.outputs.join(', '),{hint:'カンマ区切り'})}</div><div class="modal-actions"><button>閉じる</button></div>`);
+  for(const [id,prop] of [['design-instructions','designInstructions'],['node-command','command']])bindText(id,()=>item[prop]||'',value=>{item[prop]=value;invalidateEdges(item.id);});
+  for(const prop of ['inputs','outputs'])$('#node-'+prop).onchange=event=>{
+    if(design.locked(item))return;
+    const ports=[...new Set(event.target.value.split(',').map(s=>s.trim()).filter(Boolean))];
+    const affected=graph.edges.some(edge=>prop==='inputs'?edge.target===item.id&&!ports.includes(edge.targetPort):edge.source===item.id&&!ports.includes(edge.sourcePort));
+    if(ports.length>30||ports.some(p=>p.length>100)||affected){toast(affected?'接続中のポートは削除・改名できません。':'ポートは30個まで、名前は100文字以内にしてください。',true);event.target.value=item[prop].join(', ');return;}
+    mutate(()=>{item[prop]=ports;invalidateEdges(item.id);},{inspector:false});
+  };
+  if(design.locked(item))for(const control of $$('#node-details-content input,#node-details-content textarea'))control.disabled=true;
+}
+async function handoffNode(nodeID){
+  document.activeElement?.blur();
+  if(!await save(true))return;
+  const prompt=await call('copyPrompt',{nodeID});
+  modal(`<h2>依頼文をコピーしました</h2><pre>${esc(prompt)}</pre><div class="modal-actions"><button>閉じる</button><button type="button" id="copy-again" class="primary">もう一度コピー</button></div>`);
+  $('#copy-again').onclick=safe(async()=>{await call('copy',{text:prompt});toast('依頼文をコピーしました。');});
 }
 function openEdgeDetails(item){
   modal(`<h2>接続の詳細</h2><div id="edge-details-content">${field('設計指示 / variantでの差異','design-instructions',item.designInstructions||'',{textarea:true})}</div><div class="modal-actions"><button>閉じる</button></div>`);
@@ -383,11 +408,40 @@ async function deleteSelected(){
     selected=null;
   });
 }
-function addDialog(){modal(`<h2>コンポーネントを追加</h2><button type="button" class="option" id="dialog-folder"><span class="option-icon">▧</span><span><strong>ローカルのフォルダ / ファイル</strong></span></button><button type="button" class="option" id="dialog-url"><span class="option-icon">⌘</span><span><strong>リポジトリ URL / パス</strong></span></button><button type="button" class="option" id="dialog-note"><span class="option-icon">◇</span><span><strong>空のコンポーネント</strong></span></button><div class="modal-actions"><button>閉じる</button></div>`);
-  $('#dialog-folder').onclick=safe(async()=>{$('#modal').close();await chooseNodes();});
-  $('#dialog-note').onclick=()=>{$('#modal').close();mutate(()=>{const n=makeNode({kind:'note',name:'新しいモジュール'});graph.nodes.push(n);selected={type:'node',id:n.id};});};
-  $('#dialog-url').onclick=()=>{modal(`<h2>参照先を追加</h2>${field('絶対パス、またはリポジトリ URL','path-entry','')}<div class="modal-actions"><button>キャンセル</button><button type="button" class="primary" id="add-reference">追加</button></div>`);$('#path-entry').focus();$('#add-reference').onclick=safe(async()=>{const value=$('#path-entry').value.trim();if(!value)return;const info=await call('inspect',{path:value});$('#modal').close();mutate(()=>{const{files,...fields}=info;const n=makeNode(fields);graph.nodes.push(n);selected={type:'node',id:n.id};});});};
+function addDialog({point,connection}={}){
+  const add=values=>mutate(()=>{
+    for(const [i,value] of values.entries()){
+      const {files,...fields}=value;
+      const n=makeNode(fields,point?{x:point.x+i*32-(connection?.moving==='source'?224:0),y:point.y+i*40-(connection?98.5:0)}:undefined);
+      graph.nodes.push(n);
+      if(connection){
+        const incoming=connection.moving==='target',ports=incoming?n.inputs:n.outputs;
+        if(!ports.length)ports.push(incoming?'in':'out');
+        const f=connection.fixed;
+        graph.edges.push({id:uid('edge'),source:incoming?f.node:n.id,sourcePort:incoming?f.port:ports[0],target:incoming?n.id:f.node,targetPort:incoming?ports[0]:f.port,layer:connection.layer,label:'新しい接続',intent:'',mode:'data',policy:'mutable',designInstructions:''});
+      }
+      selected={type:'node',id:n.id};
+    }
+  });
+  modal(`<h2>コンポーネントを追加</h2>${connection?'<p>追加したノードにそのまま接続します。</p>':''}<button type="button" class="option" id="dialog-folder"><span class="option-icon">▧</span><span><strong>ローカルのフォルダ / ファイル</strong></span></button><button type="button" class="option" id="dialog-url"><span class="option-icon">⌘</span><span><strong>リポジトリ URL / パス</strong></span></button><button type="button" class="option" id="dialog-note"><span class="option-icon">◇</span><span><strong>空のコンポーネント</strong></span></button><div class="modal-actions"><button>閉じる</button></div>`);
+  $('#dialog-folder').onclick=safe(async()=>{const paths=await call('chooseNodes');if(!paths.length)return;const values=await Promise.all(paths.map(path=>call('inspect',{path})));add(values);$('#modal').close();});
+  $('#dialog-note').onclick=()=>{add([{kind:'note',name:'新しいモジュール'}]);$('#modal').close();};
+  $('#dialog-url').onclick=()=>{modal(`<h2>参照先を追加</h2>${field('絶対パス、またはリポジトリ URL','path-entry','')}<div class="modal-actions"><button>キャンセル</button><button type="button" class="primary" id="add-reference">追加</button></div>`);$('#path-entry').focus();$('#add-reference').onclick=safe(async()=>{const value=$('#path-entry').value.trim();if(!value)return;const info=await call('inspect',{path:value});add([info]);$('#modal').close();});};
 }
+function isBlankDrop(event){
+  const r=$('#canvas').getBoundingClientRect(),p=canvasPoint(event.clientX,event.clientY);
+  return event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom&&!graph.nodes.some(n=>p.x>=n.x-24/view.zoom&&p.x<=n.x+224+24/view.zoom&&p.y>=n.y-10/view.zoom&&p.y<=n.y+nodeHeight(n)+10/view.zoom);
+}
+function dropConnectionOnBlank(event){
+  const c=connecting,point=canvasPoint(event.clientX,event.clientY);
+  clearConnection(false);
+  if(c.edgeID){
+    mutate(()=>{const edge=graph.edges.find(e=>e.id===c.edgeID);edge[c.moving]='';edge[c.moving+'Port']='';edge[c.moving+'Position']=point;invalidateEdges(null,edge.id);selected={type:'edge',id:edge.id};});
+  }else{
+    renderEdges();addDialog({point,connection:{...c,layer:edgeLayerFilter==='all'?'data':edgeLayerFilter}});
+  }
+}
+
 async function handoff(edgeID,skipCheck=false){document.activeElement?.blur();if(!skipCheck&&workflow.check(graph,edgeID).length){showDesignCheck(edgeID,true);return;}if(!await save(true))return;const prompt=await call('copyPrompt',{edgeID});modal(`<h2>依頼文をコピーしました</h2><pre>${esc(prompt)}</pre><div class="modal-actions"><button>閉じる</button><button type="button" id="copy-again" class="primary">もう一度コピー</button></div>`);$('#copy-again').onclick=safe(async()=>{await call('copy',{text:prompt});toast('依頼文をコピーしました。');});}
 function exampleGraph(){
   return {
@@ -670,7 +724,7 @@ async function poll(){if(!root||saveTask)return;try{const state=await call('poll
  if(external){external=false;pendingExternal=null;changeOverlay=null;overlayFiles=null;updateExternalBanner();if(dirty){clearTimeout(saveTimer);saveTimer=setTimeout(()=>save(false).catch(e=>toast(e.message,true)),850);}}
  if(dirty||drag||connecting)return;
  if(JSON.stringify(state.history)!==JSON.stringify(historyState)){historyState=state.history||{};changeOverlay=null;overlayFiles=null;applyChangeOverlay();updateHeader();}
- if(JSON.stringify(reports)!==JSON.stringify(state.reports)){reports=state.reports||{};fingerprints=state.fingerprints||{};updateHeader();renderEdges();if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||''))renderInspector(true);$('#status-text').textContent='実装レポートを更新しました。';}
+ if(JSON.stringify(reports)!==JSON.stringify(state.reports||{})||JSON.stringify(nodeReports)!==JSON.stringify(state.nodeReports||{})){reports=state.reports||{};fingerprints=state.fingerprints||{};nodeReports=state.nodeReports||{};nodeFingerprints=state.nodeFingerprints||{};updateHeader();renderEdges();if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||''))renderInspector(true);$('#status-text').textContent='実装レポートを更新しました。';}
 }catch(e){$('#status-text').textContent=e.message;}}
 $('#canvas').addEventListener('pointerdown',e=>{
   if(drag||e.button>1||e.target.closest('button,.canvas-controls'))return;
@@ -724,6 +778,7 @@ window.addEventListener('pointerup',e=>{
     const exact=node?{node:node.dataset.node,port:el.dataset.port,direction:el.dataset.direction}:null;
     const candidate=exact&&validCandidate(exact)?exact:nearestPort(e.clientX,e.clientY);
     if(candidate)completeConnection(candidate);
+    else if(connecting.moved&&isBlankDrop(e))dropConnectionOnBlank(e);
     else if(connecting.edgeID||connecting.moved)clearConnection();
     else{const id=connecting.pointerID;connecting.held=false;connecting.pointerID=undefined;if(id!==undefined)try{$('#canvas').releasePointerCapture(id);}catch{}}
   }
@@ -748,7 +803,7 @@ $('#open-project').onclick=safe(async()=>{document.activeElement?.blur();if(dirt
 $('#reload-project').onclick=safe(async()=>{if(dirty&&!await confirmChoice('未保存の編集を破棄して、ディスクのグラフを読み込みます。必要なら先に JSON 書き出しで退避してください。'))return;clearTimeout(saveTimer);cleanState(await call('reload'));fit();});
 $('#export-draft').onclick=safe(()=>call('exportJSON',{graph}));
 $('#appearance-settings').onclick=()=>appearanceSettings();
-$('#show-help').onclick=()=>modal(`<h2>ヘルプ</h2><p>Shift＋クリック：追加選択 / 解除<br>選択した線の接点をドラッグ：付け替え<br>ポートの近くで離す：吸着して接続<br>空白をドラッグ：四角で囲ったノードを選択<br>Shift＋範囲選択：選択に追加<br>Space＋ドラッグ / 中ボタンドラッグ：画面を移動<br>Delete：選択したノード・接続を削除</p><p>① フォルダを配置し、右の出力から左の入力へ線を引きます。<br>② 線を選んで、つなぎたい内容を記入します。<br>③ 保存して「エージェントに渡す」を押します。<br>④ コピーした依頼文を、ローカルファイルにアクセスできる ChatGPT / Codex / Claude Code のチャットへ貼り付けます。</p><pre>graph.json                  設計の正本\nAGENT_BRIEF.md              エージェントへの指示\nconnections/&lt;id&gt;/SPEC.md    接続ごとの仕様\nimplementations/&lt;id&gt;/       生成コードの保存先\nreports/&lt;id&gt;.json          実装・検証の報告\ngraph.mmd                   Mermaid のグラフ</pre><p>保存済みプロジェクトの編集は自動保存されます。エージェントのレポートは約2秒ごとに読み込みます。元のリポジトリの更新は自動検知しないため、コードを変えた際は再検証を依頼してください。</p><div class="modal-actions"><button class="primary">わかりました</button></div>`);
+$('#show-help').onclick=()=>modal(`<h2>ヘルプ</h2><p>Shift＋クリック：追加選択 / 解除<br>選択した線の接点をドラッグ：付け替え<br>ポートの近くで離す：吸着して接続<br>新しい線を空白で離す：ノードを追加して接続<br>付け替え中に空白で離す：仕様を残して未接続にする<br>Esc：接続操作をキャンセル<br>空白をドラッグ：四角で囲ったノードを選択<br>Shift＋範囲選択：選択に追加<br>Space＋ドラッグ / 中ボタンドラッグ：画面を移動<br>Delete：選択したノード・接続を削除</p><p>① フォルダを配置し、右の出力から左の入力へ線を引きます。<br>② 線を選んで、つなぎたい内容を記入します。<br>③ 保存して「エージェントに渡す」を押します。<br>④ コピーした依頼文を、ローカルファイルにアクセスできる ChatGPT / Codex / Claude Code のチャットへ貼り付けます。</p><pre>graph.json                  設計の正本\nAGENT_BRIEF.md              エージェントへの指示\nconnections/&lt;id&gt;/SPEC.md    接続ごとの仕様\nimplementations/&lt;id&gt;/       生成コードの保存先\nreports/&lt;id&gt;.json          実装・検証の報告\ngraph.mmd                   Mermaid のグラフ</pre><p>保存済みプロジェクトの編集は自動保存されます。エージェントのレポートは約2秒ごとに読み込みます。元のリポジトリの更新は自動検知しないため、コードを変えた際は再検証を依頼してください。</p><div class="modal-actions"><button class="primary">わかりました</button></div>`);
 window.addEventListener('keydown',e=>{
   const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'');
   if(e.key==='Escape'){finishDrag(true);clearConnection();}
@@ -757,7 +812,7 @@ window.addEventListener('keydown',e=>{
   if(e.metaKey&&e.key.toLowerCase()==='o'){e.preventDefault();$('#open-project').click();}
   if(!typing&&!$('#modal').open&&!drag&&!connecting){if(e.metaKey&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}if(['Backspace','Delete'].includes(e.key)){e.preventDefault();safe(deleteSelected)();}if(e.key.toLowerCase()==='f')fit();}
 });
-window.gacchanko={call,get graph(){return graph;},get root(){return root;},get reports(){return reports;},makeNode,mutate,createConnection,select,save,poll,cleanState,fit,render,exampleGraph,addPaths,undo,redo,status,replaceDraft,handoff};
+window.gacchanko={call,get graph(){return graph;},get root(){return root;},get reports(){return reports;},get nodeReports(){return nodeReports;},makeNode,mutate,createConnection,select,save,poll,cleanState,fit,render,exampleGraph,addPaths,undo,redo,status,replaceDraft,handoff};
 async function init(){render();if(native){const state=await call('state');if(state.project){cleanState(state);fit();}else{try{const backup=JSON.parse(localStorage.getItem('gacchanko-draft')||'null');if(backup?.graph&&await confirmChoice('前回の未保存の編集を復元しますか？')){graph=backup.graph;root='';revision='';markDirty();render();fit();}}catch(e){toast(e.message,true);}}}setInterval(poll,2000);}
 window.gacchankoReady=init().catch(e=>toast(e.message,true));
 
@@ -896,7 +951,7 @@ function showDesignCheck(edgeID,forHandoff=false){
   $$('[data-check-issue]').forEach(button=>button.onclick=()=>{
     const i=issues[Number(button.dataset.checkIssue)];$('#modal').close();edgeLayerFilter='all';$('#edge-layer-filter').value='all';
     if(i.kind==='project'){selected=null;render();}else select(i.kind,i.id);
-    if(i.kind==='node')$(`[data-select-node="${i.id}"]`)?.click();else if(i.kind==='edge'){const e=graph.edges.find(e=>e.id===i.id),n=graph.nodes.find(n=>n.id===e.source),r=$('#canvas').getBoundingClientRect();view.x=r.width/2-(n.x+112)*view.zoom;view.y=r.height/2-(n.y+70)*view.zoom;transform();}
+    if(i.kind==='node')$(`[data-select-node="${i.id}"]`)?.click();else if(i.kind==='edge'){const e=graph.edges.find(e=>e.id===i.id),p=edgePoint(e,'source'),r=$('#canvas').getBoundingClientRect();view.x=r.width/2-p.x*view.zoom;view.y=r.height/2-p.y*view.zoom;transform();}
     if(i.kind==='edge'&&(['design-instructions','edge-layer'].includes(i.field)||i.field.startsWith('execution-')))openEdgeDetails(graph.edges.find(e=>e.id===i.id));
     $('#'+i.field)?.focus();$('#'+i.field)?.scrollIntoView?.({block:'nearest'});
   });

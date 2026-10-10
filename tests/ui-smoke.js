@@ -146,8 +146,9 @@
   P.undo();
   pickEnd('target');pointer(window,'pointermove',snapped.x,snapped.y);await key('Escape');
   check(JSON.stringify(P.graph.edges[0])===originalWire&&!document.querySelector('.snap-target'),'Escape cancels rewiring and clears snap highlight');
-  pickEnd('target');pointer(window,'pointermove',100,100);pointer(window,'pointerup',100,100);
-  check(JSON.stringify(P.graph.edges[0])===originalWire,'releasing away from ports preserves original edge');
+  pickEnd('target');const blankDrop={x:canvas.getBoundingClientRect().right-40,y:canvas.getBoundingClientRect().bottom-40};pointer(window,'pointermove',blankDrop.x,blankDrop.y);pointer(window,'pointerup',blankDrop.x,blankDrop.y);
+  check(P.graph.edges[0].target===''&&P.graph.edges[0].targetPosition&&P.graph.edges[0].intent==='Use JPEG instead','releasing on blank canvas retains an unconnected edge and its intent');
+  P.undo();check(JSON.stringify(P.graph.edges[0])===originalWire,'undo restores a detached endpoint');
   pickEnd('target');const wrong=portScreen(third,'out');pointer(window,'pointermove',wrong.x,wrong.y);pointer(window,'pointerup',wrong.x,wrong.y);
   check(JSON.stringify(P.graph.edges[0])===originalWire,'input endpoint cannot attach to another output');
   pickEnd('target');pointer(window,'pointermove',snapped.x,snapped.y);pointer(window,'pointercancel');

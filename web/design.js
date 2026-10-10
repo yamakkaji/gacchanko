@@ -34,18 +34,18 @@ window.gacchankoDesign = (() => {
     return result;
   }
   function capture(graph,ids,{id,name,instructions,version=1}){
-    const members=new Set(ids);
+    const members=new Set(ids.filter(id=>graph.nodes.some(n=>n.id===id)));
     const clean=item=>{const value=copy(item);value.policy='mutable';delete value.derivedFrom;return value;};
     const nodes=graph.nodes.filter(n=>members.has(n.id)).map(clean);
     if(!nodes.length)throw Error('原型にするノードを選択してください。');
-    const edges=graph.edges.filter(e=>members.has(e.source)&&members.has(e.target)).map(clean);
+    const edges=graph.edges.filter(e=>(members.has(e.source)||members.has(e.target))&&(!e.source||members.has(e.source))&&(!e.target||members.has(e.target))).map(clean);
     for(const e of edges)if(e.execution)e.execution.after=e.execution.after.filter(id=>edges.some(x=>x.id===id));
     return {id,version,name,instructions,nodes,edges};
   }
   function instantiate(template,newID,offset={x:60,y:60}){
     const ids=new Map(template.nodes.map(n=>[n.id,newID('node')])),edgeIDs=new Map(template.edges.map(e=>[e.id,newID('edge')]));
     const derive=(item,kind)=>({...copy(item),id:kind==='node'?ids.get(item.id):edgeIDs.get(item.id),policy:'mutable',derivedFrom:{templateID:template.id,version:template.version,memberID:item.id}});
-    return {nodes:template.nodes.map(n=>({...derive(n,'node'),x:n.x+offset.x,y:n.y+offset.y})),edges:template.edges.map(e=>({...derive(e,'edge'),source:ids.get(e.source),target:ids.get(e.target),...(e.execution?{execution:{...copy(e.execution),after:e.execution.after.map(id=>edgeIDs.get(id))}}:{})}))};
+    return {nodes:template.nodes.map(n=>({...derive(n,'node'),x:n.x+offset.x,y:n.y+offset.y})),edges:template.edges.map(e=>({...derive(e,'edge'),source:e.source?ids.get(e.source):'',target:e.target?ids.get(e.target):'',...Object.fromEntries(['sourcePosition','targetPosition'].filter(k=>e[k]).map(k=>[k,{x:e[k].x+offset.x,y:e[k].y+offset.y}])),...(e.execution?{execution:{...copy(e.execution),after:e.execution.after.map(id=>edgeIDs.get(id))}}:{})}))};
   }
   return Object.freeze({locked,violations,changes,capture,instantiate});
 })();

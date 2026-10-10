@@ -42,12 +42,12 @@ interface GacchankoPlatform {
 | `poll` | `{}` | ProjectSnapshot または `{externalChange:true,diskRevision:string}` |
 | `adoptExternal` | `{diskRevision, selections: ["node:id", "edge:id", "template:id:version", "project:project"]}` | 検証・選択採用した ProjectSnapshot |
 | `reload` | `{}` | ディスクから再読み込みした ProjectSnapshot |
-| `copyPrompt` | `{edgeID?:string}` | 依頼文をコピーし、その文字列を返す |
+| `copyPrompt` | `{edgeID?:string,nodeID?:string}` | 依頼文をコピーし、その文字列を返す |
 | `copy` | `{text:string}` | クリップボードへコピー |
 | `reveal` | `{}` | OS のファイルマネージャーでプロジェクトを表示 |
 | `exportJSON` | `{graph}` | 退避先を選択して保存し、パスを返す。キャンセル時 `null` |
 
-ProjectSnapshot は `{project,root,revision,reports,fingerprints}`。`project` は schemaVersion 1 のグラフ。テスト専用コマンドは製品の移植対象に含めなくてよい。
+ProjectSnapshot は `{project,root,revision,reports,fingerprints,nodeReports,nodeFingerprints}`。`copyPrompt`はedgeIDとnodeIDの同時指定を拒否し、nodeID指定時はそのノードだけの依頼文を生成します。ノードのレポートとfingerprintはエッジと別のマップで扱います。`project` は schemaVersion 1 のグラフ。テスト専用コマンドは製品の移植対象に含めなくてよい。
 
 `drop` イベントの payload は `{paths:string[],x:number,y:number}`。座標は **WebView の表示領域を基準とする CSS ピクセル**。Tauri 側の物理ピクセルをそのまま渡さず、表示倍率を考慮して変換する。`error` イベントは表示する文字列を渡す。
 
@@ -94,3 +94,11 @@ The host snapshot includes `history` (head, commits, per-member changes, changed
 - `poll` returns pending changes and protection violations instead of accepting them. A valid external edit is adopted by `reload` only when the frontend has no local draft.
 
 `web/design.js` contains pure graph diff, protection, subgraph capture and variant operations. The Swift store independently enforces the policy at the persistence boundary. Tauri hosts must reproduce the store checks; disabling a control in the frontend is insufficient.
+
+## 未接続のエッジ
+
+エッジは独立したコンポーネントなので、付け替えで空白に離しても削除しない。未接続側の `source` / `target` と対応する `sourcePort` / `targetPort` は空文字とし、`sourcePosition` / `targetPosition` にキャンバス座標 `{x, y}` を保存する。接続済みの側には位置フィールドを持たせない。既存の完全接続の形式は変更しない。存在しないノードID・ポートは引き続き不正として拒否する。
+
+端点の座標は実装fingerprintに含めず、接続・切断は含める。未接続エッジもSPECとMermaidへ出力し、設計チェックとエージェント向け仕様書で未接続であることを明記する。ID・意味内容・実装ファイル・レポートは保持する。原型に含まれる未接続エッジも派生時に保持し、端点の位置をノードと同じ量だけ移動する。
+
+新規の線を空白で離す操作は、追加先の座標・接続方向・レイヤーをノード追加画面に渡す。追加を確定した時だけノードとエッジを一括変更として記録する。追加画面のキャンセル・Esc・キャンバス外へのドロップでは既存の設計を変更しない。

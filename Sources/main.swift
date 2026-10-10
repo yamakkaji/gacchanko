@@ -35,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     var web: CanvasWebView!
     let store = ProjectStore()
     var dirty = false
+    private var discardApproved = false
     var initialError: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -135,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 guard let root = store.root else { throw PatchError("プロジェクトを開いてください。") }
                 let result = try store.open(root); try store.exportBrief(); dirty = false; reply(id, value: result)
             case "copyPrompt":
-                let text = try store.prompt(edgeID: args["edgeID"] as? String)
+                let text = try store.prompt(edgeID: args["edgeID"] as? String, nodeID: args["nodeID"] as? String)
                 NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
                 reply(id, value: text)
             case "copy":
@@ -171,9 +172,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         NSApp.terminate(nil)
     }
     func allowClose() -> Bool {
-        guard dirty else { return true }
+        guard dirty && !discardApproved else { return true }
         let alert = NSAlert(); alert.messageText = "まだ保存されていない編集があります"; alert.informativeText = "編集を続けて保存するか、未保存の変更を破棄して閉じてください。"; alert.addButton(withTitle: "編集を続ける"); alert.addButton(withTitle: "破棄して閉じる")
-        return alert.runModal() == .alertSecondButtonReturn
+        guard alert.runModal() == .alertSecondButtonReturn else { return false }
+        // Closing the last window also requests application termination. Reuse
+        // this approval even if a queued web message marks the document dirty.
+        discardApproved = true
+        return true
     }
     func windowShouldClose(_ sender: NSWindow) -> Bool { allowClose() }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply { allowClose() ? .terminateNow : .terminateCancel }

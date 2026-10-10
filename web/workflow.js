@@ -17,6 +17,7 @@ window.gacchankoWorkflow=(()=>{
     for(const e of graph.edges)adjacency.get(e.source)?.push(e.target);
     function reaches(start,target){if(!reachable.has(start)){const seen=new Set(),queue=[start];while(queue.length){const id=queue.pop();if(seen.has(id))continue;seen.add(id);queue.push(...(adjacency.get(id)||[]));}reachable.set(start,seen);}return reachable.get(start).has(target);}
     for(const e of edges){
+      if(!e.source||!e.target)add('edge',e.id,'edge-label','未接続の端点があります。接続先を決めてください');
       if(!e.intent.trim())add('edge',e.id,'edge-intent','何を渡し、何を実現するかが未入力');
       if(!e.label.trim()||e.label==='新しい接続')add('edge',e.id,'edge-label','接続名を具体的にしてください');
       if(e.execution?.after.some(id=>!graph.edges.some(x=>x.id===id)))add('edge',e.id,'execution-after','削除された接続への完了待ちがあります');

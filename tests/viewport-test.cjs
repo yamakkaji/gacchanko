@@ -8,8 +8,10 @@ const dom=new JSDOM(read('index.html'),{url:'https://gacchanko.local/',runScript
 w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
 w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};
 w.HTMLElement.prototype.getBoundingClientRect=()=>({left:0,top:0,width:1000,height:800,right:1000,bottom:800});
-let stored=null;
+let stored=null,lastPromptArgs=null,pollState=null;
 w.gacchankoPlatform={kind:'test',async request(command,args){
+ if(command==='copyPrompt'){lastPromptArgs=args;return 'Selected node '+args.nodeID;}
+ if(command==='poll')return pollState;
  if(command==='state')return {project:null};if(command==='dirty')return true;
  if(command==='save'){stored=JSON.parse(JSON.stringify(args.graph));return {project:stored,root:'/tmp/viewport.gacchanko',revision:'next',reports:{}};}
  if(command==='unlock')return null; // A cancelled native unlock must retain protection.
@@ -86,6 +88,27 @@ const frame=()=>new Promise(r=>w.requestAnimationFrame(r));
  api.select('edge','e0');$('#edge-appearance-action').click();$('#reset-appearance').click();
  assert.equal(JSON.stringify(api.graph.edges[0]),JSON.stringify(edgeBefore),'reset restores global appearance without modifying definition');$('#modal').close();
  api.select('edge','e0');$('#edge-details').click();assert($('#design-instructions').disabled&&$('#execution-dispatch').disabled);$('#modal').close();
+ api.select('node','n1');
+ assert($('#node-handoff')&&$('#node-details')&&$('.status-card'),'node exposes handoff, details and report');
+ assert.equal($('#node-details').textContent,'ノードの詳細…');
+ $('#node-details').click();
+ $('#node-command').value='python component.py';$('#node-command').dispatchEvent(new w.Event('change'));
+ $('#design-instructions').value='Keep node contract';$('#design-instructions').dispatchEvent(new w.Event('change'));
+ assert.equal(api.graph.nodes[1].command,'python component.py');assert.equal(api.graph.nodes[1].designInstructions,'Keep node contract');
+ $('#node-inputs').value='renamed';$('#node-inputs').dispatchEvent(new w.Event('change'));
+ assert.equal(api.graph.nodes[1].inputs[0],'in','connected port rename is rejected');
+ $('#node-inputs').value='in, extra';$('#node-inputs').dispatchEvent(new w.Event('change'));
+ assert.equal(api.graph.nodes[1].inputs[1],'extra');$('#modal').close();
+ $('#node-handoff').click();await delay(30);
+ assert.equal(lastPromptArgs.nodeID,'n1');assert.equal(lastPromptArgs.edgeID,undefined);$('#modal').close();
+ pollState={project:api.graph,root:'/tmp/viewport.gacchanko',revision:'next',reports:{},nodeReports:{n1:{status:'verified',summary:'Node test passed',checks:['node-check'],files:['components/nodes/n1/implementation/main.py']}}};
+ await api.poll();
+ assert($('.status-card.verified')&&$('.report-checks').textContent.includes('node-check'),'node report and checks refreshed by poll');
+ $('#node-description').value='Changed behaviour';$('#node-description').dispatchEvent(new w.Event('change'));api.render();
+ assert.equal(api.nodeReports.n1.status,'stale','node description immediately marks node report stale');
+ api.select('node','n0');$('#node-details').click();assert($('#node-command').disabled&&$('#design-instructions').disabled&&$('#node-inputs').disabled,'immutable node details remain protected');$('#modal').close();
+ assert.equal($('#inspector').lastElementChild.id,'node-appearance-action');
+ console.log('PASS node handoff scope, details, port safety, report polling and protection');
  console.log('PASS shared six fields, Description editing, bottom appearance buttons, edge persistence and protected per-edge styles');
  console.log('PASS zoom/pan DOM stability, compact fields, IP access, metadata preservation, undo/redo and cancelled unlock');
  }finally{w.close();}

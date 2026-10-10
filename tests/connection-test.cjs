@@ -14,7 +14,7 @@ w.gacchankoPlatform={kind:'test',async request(command,args){
  if(command==='save'){stored=JSON.parse(JSON.stringify(args.graph));return {project:stored,root:'/tmp/connection.gacchanko',revision:'next',reports:{}};}
  throw Error(command);
 },on(){return ()=>{};}};
-for(const name of ['bridge.js','appearance.js','node-appearance.js','workflow.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(base,'web',name),'utf8'));
+for(const name of ['i18n.js','bridge.js','appearance.js','node-appearance.js','workflow.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(base,'web',name),'utf8'));
 const $=s=>w.document.querySelector(s),tick=()=>new Promise(r=>setTimeout(r,0));
 const pointer=(el,type,p)=>el.dispatchEvent(new w.MouseEvent(type,{bubbles:true,button:0,clientX:p.x,clientY:p.y}));
 const screen=p=>{const [x,y,z]=$('#world').style.transform.match(/[-\d.]+/g).map(Number);return {x:x+p.x*z,y:y+p.y*z};};

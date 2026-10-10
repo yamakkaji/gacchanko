@@ -22,7 +22,7 @@ let spacePressed=false;
 let view={x:65,y:65,zoom:1}, connecting=null, drag=null, undoStack=[], redoStack=[], editSerial=0;
 let saveTimer, toastTimer, saveTask=null, external=false, inspectorKey='', draftBackupError=false;
 const symbols={repository:'⌘',directory:'▧',model:'✧',service:'⇄',application:'▣',note:'◇'};
-const statusNames={pending:'未実装',implemented:'実装済',verified:'検証済',blocked:'確認が必要',stale:'要更新'};
+const statusNames=i18n.messages({pending:'未実装',implemented:'実装済',verified:'検証済',blocked:'確認が必要',stale:'要更新'});
 function toast(message,error=false) {
   $('#toast').textContent=message; $('#toast').classList.toggle('error',error); $('#toast').hidden=false;
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('#toast').hidden=true,error?7000:3500);
@@ -31,12 +31,12 @@ function safe(action) { return (...args)=>Promise.resolve().then(()=>action(...a
 function remember() { undoStack.push(clone(graph)); if(undoStack.length>60)undoStack.shift(); redoStack=[]; }
 function mutate(action,{inspector=true}={}) {
   const before=clone(graph);action();
-  if(design.violations(before,graph).length){graph=before;toast('保護された要素・接続は変更できません。先に保護を解除してください。',true);render(true);return false;}
+  if(design.violations(before,graph).length){graph=before;toast(i18n.t('保護された要素・接続は変更できません。先に保護を解除してください。'),true);render(true);return false;}
   undoStack.push(before);if(undoStack.length>60)undoStack.shift();redoStack=[];markDirty();render(inspector);return true;
 }
 function markDirty() {
   dirty=true; editSerial++; call('dirty',{value:true}).catch(()=>{});
-  try { localStorage.setItem('gacchanko-draft',JSON.stringify({graph,root,revision})); } catch { if(!draftBackupError){draftBackupError=true;toast('一時バックアップを保存できません。保存ボタンでプロジェクトを保存してください。',true);} }
+  try { localStorage.setItem('gacchanko-draft',JSON.stringify({graph,root,revision})); } catch { if(!draftBackupError){draftBackupError=true;toast(i18n.t('一時バックアップを保存できません。保存ボタンでプロジェクトを保存してください。'),true);} }
   clearTimeout(saveTimer); if(root&&!external)saveTimer=setTimeout(()=>save(false).catch(e=>toast(e.message,true)),850);
   updateHeader();
 }
@@ -49,7 +49,7 @@ function cleanState(state,{replace=true}={}) {
 }
 async function save(interactive=true) {
   clearTimeout(saveTimer);
-  if(external)throw Error('外部の変更を確認してから保存してください。');
+  if(external)throw Error(i18n.t('外部の変更を確認してから保存してください。'));
   if(saveTask){await saveTask;if(dirty)return save(interactive);return true;}
   if(!root&&!interactive)return false;
   const serial=editSerial;
@@ -63,16 +63,16 @@ async function save(interactive=true) {
     if(serial===editSerial){dirty=false;call('dirty',{value:false}).catch(()=>{});try{localStorage.removeItem('gacchanko-draft');}catch{}}
     else {dirty=true;call('dirty',{value:true}).catch(()=>{});saveTimer=setTimeout(()=>save(false).catch(e=>toast(e.message,true)),100);}
     savedGraph=clone(outgoing);historyState=state.history||{};changeOverlay=null;overlayFiles=null;applyChangeOverlay();updateHeader();if(wasNew)renderInspector(true);return true;
-  } catch(e){$('#save-state').textContent='保存できません';throw e;}
+  } catch(e){$('#save-state').textContent=i18n.t('保存できません');throw e;}
   finally{saveTask=null;}
 }
 function updateHeader(){
   $('#project-title').textContent=graph.name;$('#canvas-project-title').textContent=graph.name;$('#workspace-name').textContent=graph.name;
-  $('#workspace-subtitle').textContent=root?root.split('/').pop():'未保存';
-  $('#save-state').textContent=dirty?(root?'変更あり':'未保存'):(root?'保存済み':'未保存');
-  $('#node-count').textContent=graph.nodes.length;$('#edge-count').textContent=`${graph.edges.length} connections`;
-  $('#ready-count').textContent=`${graph.edges.filter(e=>status(e.id)==='verified').length} verified`;
-  $('#show-history').textContent=(historyState.protectedFiles?.length?'⚠ 保護された実装に変更':'変更履歴')+(historyState.head?' · '+historyState.head.slice(0,7):'');
+  $('#workspace-subtitle').textContent=root?root.split('/').pop():i18n.t('未保存');
+  $('#save-state').textContent=dirty?(root?i18n.t('変更あり'):i18n.t('未保存')):(root?i18n.t('保存済み'):i18n.t('未保存'));
+  $('#node-count').textContent=graph.nodes.length;$('#edge-count').textContent=i18n.language==='ja'?`${graph.edges.length} 接続`:`${graph.edges.length} connections`;
+  $('#ready-count').textContent=`${graph.edges.filter(e=>status(e.id)==='verified').length} ${i18n.t('検証済')}`;
+  $('#show-history').textContent=(historyState.protectedFiles?.length?i18n.t('⚠ 保護された実装に変更'):i18n.t('変更履歴'))+(historyState.head?' · '+historyState.head.slice(0,7):'');
   $('#undo').disabled=!undoStack.length;$('#redo').disabled=!redoStack.length;
 }
 function status(id){return reports[id]?.status||'pending';}
@@ -109,10 +109,10 @@ function renderEdges(){
   clearTimeout(edgeZoomTimer);renderedEdgeZoom=view.zoom;
   $('#edge-paths').innerHTML=graph.edges.filter(e=>edgeLayerFilter==='all'||(e.layer||'data')===edgeLayerFilter).map((e,index)=>{
     const a=edgePoint(e,'source'),b=edgePoint(e,'target');
-    const route=edgeRoute(e.source,e.target,e.id),geometry=appearance.geometry(a,b,route),mid=geometry.point(.5),x=mid.x,y=mid.y, label=((e.layer||'data')==='control'?'▶ ':e.layer==='event'?'ϟ ':'')+(e.execution?.dispatch==='async'?'⇢ ':'')+(design.locked(e)?(e.policy==='template'?'◇ ':'🔒 '):e.derivedFrom?'↳ ':'')+(e.mode==='request'?'↔ ':'')+(!e.source||!e.target?'未接続 · ':'')+(e.label||'接続'), width=Math.min(230,Math.max(85,[...label].length*7+38));
+    const route=edgeRoute(e.source,e.target,e.id),geometry=appearance.geometry(a,b,route),mid=geometry.point(.5),x=mid.x,y=mid.y, label=((e.layer||'data')==='control'?'▶ ':e.layer==='event'?'ϟ ':'')+(e.execution?.dispatch==='async'?'⇢ ':'')+(design.locked(e)?(e.policy==='template'?'◇ ':'🔒 '):e.derivedFrom?'↳ ':'')+(e.mode==='request'?'↔ ':'')+(!e.source||!e.target?i18n.t('未接続 · '):'')+(e.label||i18n.t('接続')), width=Math.min(230,Math.max(85,[...label].length*7+38));
     const colour={verified:'#416762',implemented:'#715669',stale:'#9a6a23',blocked:'#a54844'}[status(e.id)]||'#486080';
-    return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-layer="${esc(e.layer||'data')}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?' · リクエスト / 応答':''}</title><path class="edge-hit" d="${geometry.d}"/>${appearance.render(a,b,{...route,geometry,settings:e.appearance||edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
-  }).join('')+graph.edges.filter(e=>edgeLayerFilter==='all'||(e.layer||'data')===edgeLayerFilter).flatMap(e=>['source','target'].filter(end=>!e[end]).map(end=>{const p=edgePoint(e,end);return `<circle class="edge-loose-end" data-loose-edge="${esc(e.id)}" data-loose-end="${end}" cx="${p.x}" cy="${p.y}" r="${7/view.zoom}" vector-effect="non-scaling-stroke"><title>未接続 · ドラッグして接続</title></circle>`;})).join('')+connectionPreview();
+    return `<g class="edge-group ${selected?.type==='edge'&&selected.id===e.id?'selected':''}" data-layer="${esc(e.layer||'data')}" data-edge="${esc(e.id)}" style="color:${colour}"><title>${esc(e.sourcePort)} → ${esc(e.targetPort)}${e.mode==='request'?i18n.t(' · リクエスト / 応答'):''}</title><path class="edge-hit" d="${geometry.d}"/>${appearance.render(a,b,{...route,geometry,settings:e.appearance||edgeAppearance,zoom:view.zoom,id:'canvas-edge-'+index,statusColour:colour,request:e.mode==='request',selected:selected?.type==='edge'&&selected.id===e.id})}<rect class="edge-label-bg" x="${x-width/2}" y="${y-26-8/view.zoom}" width="${width}" height="26" rx="6"/><circle class="edge-status" cx="${x-width/2+10}" cy="${y-13-8/view.zoom}" r="3" fill="${colour}"><title>${statusNames[status(e.id)]}</title></circle><text class="edge-label" x="${x+5}" y="${y-9.5-8/view.zoom}" text-anchor="middle">${esc(label.length>27?label.slice(0,26)+'…':label)}</text></g>`;
+  }).join('')+graph.edges.filter(e=>edgeLayerFilter==='all'||(e.layer||'data')===edgeLayerFilter).flatMap(e=>['source','target'].filter(end=>!e[end]).map(end=>{const p=edgePoint(e,end);return i18n.html`<circle class="edge-loose-end" data-loose-edge="${esc(e.id)}" data-loose-end="${end}" cx="${p.x}" cy="${p.y}" r="${7/view.zoom}" vector-effect="non-scaling-stroke"><title>未接続 · ドラッグして接続</title></circle>`;})).join('')+connectionPreview();
   $$('[data-loose-edge]').forEach(el=>el.addEventListener('pointerdown',event=>{if(event.button!==0||spacePressed||drag)return;event.preventDefault();event.stopPropagation();beginConnection(event,el.dataset.looseEnd,graph.edges.find(e=>e.id===el.dataset.looseEdge));}));
   $$('.edge-group').forEach(el=>{
     el.classList.toggle('reconnecting',connecting?.edgeID===el.dataset.edge);
@@ -121,7 +121,7 @@ function renderEdges(){
   renderConnectionHandles();updatePortStates();applyChangeOverlay();applyCheckHighlights();
 }
 function renderNodes(){
-  $('#nodes').innerHTML=graph.nodes.map(n=>`<div class="node ${esc(n.kind)} ${selectedNodeIDs().includes(n.id)?'selected':''}" data-surface="${n.appearance?nodeLook.normalize(n.appearance,n.kind).surface:''}" data-node-header="${n.appearance?nodeLook.normalize(n.appearance,n.kind).header:''}" style="left:${n.x}px;top:${n.y}px;${n.appearance?nodeLook.style(n.appearance,n.kind):''}" data-node="${esc(n.id)}"><div class="node-head"><div class="node-symbol">${symbols[n.kind]||'◇'}</div><div class="node-info"><div class="node-kind">${esc(n.kind)} · ${esc(workflow.states[n.implementationState||'unspecified'])}</div><div class="node-name" title="${esc(n.name)}">${esc(n.name)}</div></div><span class="node-menu policy-badge" title="${esc(n.policy||'mutable')}">${n.policy==='immutable'?'🔒':n.policy==='template'?'◇':n.derivedFrom?'↳':'···'}</span></div><div class="node-path ${n.path?'':'unresolved'}" title="${esc(n.path)}">${esc(n.path||'参照先を設定してください')}</div>${Array.from({length:Math.max(n.inputs.length,n.outputs.length,1)},(_,i)=>`<div class="port-row">${n.inputs[i]?`<div class="port-side"><button aria-label="${esc(n.name)} input ${esc(n.inputs[i])}" class="port in" data-direction="in" data-port="${esc(n.inputs[i])}"></button><span>${esc(n.inputs[i])}</span></div>`:''}${n.outputs[i]?`<div class="port-side out"><span>${esc(n.outputs[i])}</span><button aria-label="${esc(n.name)} output ${esc(n.outputs[i])}" class="port out" data-direction="out" data-port="${esc(n.outputs[i])}"></button></div>`:''}</div>`).join('')}</div>`).join('');
+  $('#nodes').innerHTML=graph.nodes.map(n=>`<div class="node ${esc(n.kind)} ${selectedNodeIDs().includes(n.id)?'selected':''}" data-surface="${n.appearance?nodeLook.normalize(n.appearance,n.kind).surface:''}" data-node-header="${n.appearance?nodeLook.normalize(n.appearance,n.kind).header:''}" style="left:${n.x}px;top:${n.y}px;${n.appearance?nodeLook.style(n.appearance,n.kind):''}" data-node="${esc(n.id)}"><div class="node-head"><div class="node-symbol">${symbols[n.kind]||'◇'}</div><div class="node-info"><div class="node-kind">${esc(i18n.t(n.kind))} · ${esc(workflow.states[n.implementationState||'unspecified'])}</div><div class="node-name" title="${esc(n.name)}">${esc(n.name)}</div></div><span class="node-menu policy-badge" title="${esc(n.policy||'mutable')}">${n.policy==='immutable'?'🔒':n.policy==='template'?'◇':n.derivedFrom?'↳':'···'}</span></div><div class="node-path ${n.path?'':'unresolved'}" title="${esc(n.path)}">${esc(n.path||i18n.t('参照先を設定してください'))}</div>${Array.from({length:Math.max(n.inputs.length,n.outputs.length,1)},(_,i)=>`<div class="port-row">${n.inputs[i]?`<div class="port-side"><button aria-label="${esc(n.name)} input ${esc(n.inputs[i])}" class="port in" data-direction="in" data-port="${esc(n.inputs[i])}"></button><span>${esc(n.inputs[i])}</span></div>`:''}${n.outputs[i]?`<div class="port-side out"><span>${esc(n.outputs[i])}</span><button aria-label="${esc(n.name)} output ${esc(n.outputs[i])}" class="port out" data-direction="out" data-port="${esc(n.outputs[i])}"></button></div>`:''}</div>`).join('')}</div>`).join('');
   $$('.node').forEach(el=>{
     el.addEventListener('pointerdown',e=>{
       if(drag||e.button!==0||spacePressed||e.target.closest('.port'))return;
@@ -142,7 +142,7 @@ function renderNodes(){
       // selected edge's endpoint handles identify exactly which wire to move.
       const incoming=graph.edges.filter(edge=>(edgeLayerFilter==='all'||(edge.layer||'data')===edgeLayerFilter)&&edge.target===candidate.node&&edge.targetPort===candidate.port);
       if(candidate.direction==='in'&&incoming.length===1)beginConnection(e,'target',incoming[0]);
-      else if(candidate.direction==='in'&&incoming.length>1)toast('付け替える線を選び、その接点をドラッグしてください。');
+      else if(candidate.direction==='in'&&incoming.length>1)toast(i18n.t('付け替える線を選び、その接点をドラッグしてください。'));
       else beginConnection(e,candidate.direction==='out'?'target':'source',null,candidate);
     }));
   });
@@ -207,7 +207,7 @@ function updatePortStates(){
   });
 }
 function beginConnection(event,moving,edge=null,port=null){
-  if(edge&&(design.locked(edge)||graph.nodes.some(n=>[edge.source,edge.target].includes(n.id)&&design.locked(n)))){toast('保護された接続です。付け替えるには保護を解除してください。',true);return;}
+  if(edge&&(design.locked(edge)||graph.nodes.some(n=>[edge.source,edge.target].includes(n.id)&&design.locked(n)))){toast(i18n.t('保護された接続です。付け替えるには保護を解除してください。'),true);return;}
   clearConnection(false);
   const fixedEnd=moving==='target'?'source':'target';
   const fixed=edge?{node:edge[fixedEnd],port:edge[fixedEnd+'Port'],direction:fixedEnd==='source'?'out':'in',point:edgePoint(edge,fixedEnd)}:port;
@@ -216,7 +216,7 @@ function beginConnection(event,moving,edge=null,port=null){
   connecting={moving,fixed,edgeID:edge?.id,point,candidate:null,pointerID:event.pointerId,held:true,moved:false,startX:event.clientX,startY:event.clientY};
   $('#canvas').focus({preventScroll:true});
   if(event.pointerId!==undefined)try{$('#canvas').setPointerCapture(event.pointerId);}catch{}
-  $('#connect-hint').textContent=(moving==='target'?'入力':'出力')+'ポートへドラッグ · Esc でキャンセル';
+  $('#connect-hint').textContent=(moving==='target'?i18n.t('入力'):i18n.t('出力'))+i18n.t('ポートへドラッグ · Esc でキャンセル');
   $('#connect-hint').hidden=false;renderEdges();renderInspector(true);
 }
 function clearConnection(redraw=true){
@@ -252,7 +252,7 @@ function renderConnectionHandles(){
   const edge=selected?.type==='edge'?graph.edges.find(e=>e.id===selected.id):null;
   $('#edge-handles').innerHTML=!edge||(edgeLayerFilter!=='all'&&(edge.layer||'data')!==edgeLayerFilter)||design.locked(edge)||graph.nodes.some(n=>[edge.source,edge.target].includes(n.id)&&design.locked(n))||connecting?'':['source','target'].map(end=>{
     const point=edgePoint(edge,end);
-    return `<circle class="edge-endpoint" data-reconnect="${end}" cx="${point.x}" cy="${point.y}" r="${7/view.zoom}" vector-effect="non-scaling-stroke"><title>${end==='source'?'出力':'入力'}側を付け替え</title></circle>`;
+    return i18n.html`<circle class="edge-endpoint" data-reconnect="${end}" cx="${point.x}" cy="${point.y}" r="${7/view.zoom}" vector-effect="non-scaling-stroke"><title>${end==='source'?i18n.t('出力'):i18n.t('入力')}側を付け替え</title></circle>`;
   }).join('');
   $$('[data-reconnect]').forEach(el=>el.addEventListener('pointerdown',event=>{
     if(event.button!==0||spacePressed||drag)return;event.preventDefault();event.stopPropagation();beginConnection(event,el.dataset.reconnect,edge);
@@ -261,8 +261,8 @@ function renderConnectionHandles(){
 function createConnection(source,target,sourcePort,targetPort){
   const layer=edgeLayerFilter==='all'?'data':edgeLayerFilter;
   clearConnection(false);
-  if(graph.edges.some(e=>(e.layer||'data')===layer&&e.source===source&&e.target===target&&e.sourcePort===sourcePort&&e.targetPort===targetPort)){toast('このレイヤーのポート間には接続がすでにあります。');renderEdges();return;}
-  const edge={id:uid('edge'),source,target,sourcePort,targetPort,layer,label:'新しい接続',intent:'',mode:'data',policy:'mutable',designInstructions:''};
+  if(graph.edges.some(e=>(e.layer||'data')===layer&&e.source===source&&e.target===target&&e.sourcePort===sourcePort&&e.targetPort===targetPort)){toast(i18n.t('このレイヤーのポート間には接続がすでにあります。'));renderEdges();return;}
+  const edge={id:uid('edge'),source,target,sourcePort,targetPort,layer,label:i18n.t('新しい接続'),intent:'',mode:'data',policy:'mutable',designInstructions:''};
   mutate(()=>{graph.edges.push(edge);selected={type:'edge',id:edge.id};});
   renderInspector(true);setTimeout(()=>$('#edge-intent')?.focus(),30);
 }
@@ -271,10 +271,10 @@ function makeNode(values={},point){const r=$('#canvas').getBoundingClientRect();
 async function addPaths(paths,position){const values=[];for(const path of paths){try{values.push(await call('inspect',{path}));}catch(e){toast(e.message,true);}}
   if(!values.length)return;
   mutate(()=>{for(const [i,value]of values.entries()){const {files,...fields}=value;const p=position?{x:position.x+i*32,y:position.y+i*40}:undefined;const n=makeNode({...fields,implementationState:'unspecified'},p);graph.nodes.push(n);selected={type:'node',id:n.id};}});
-  $('#status-text').textContent=`${values.length} 個のコンポーネントを追加`;
+  $('#status-text').textContent=i18n.html`${values.length} 個のコンポーネントを追加`;
 }
 async function chooseNodes(){const paths=await call('chooseNodes');if(paths.length)await addPaths(paths);}
-function field(label,id,value,{textarea=false,hint='',cls=''}={}){return `<label class="field"><span>${label}</span>${textarea?`<textarea id="${id}" class="${cls}">${esc(value)}</textarea>`:`<input id="${id}" value="${esc(value)}">`}${hint?`<small>${hint}</small>`:''}</label>`;}
+function field(label,id,value,{textarea=false,hint='',cls=''}={}){return `<label class="field"><span>${esc(i18n.t(label))}</span>${textarea?`<textarea id="${id}" class="${cls}">${esc(value)}</textarea>`:`<input id="${id}" value="${esc(value)}">`}${hint?`<small>${hint}</small>`:''}</label>`;}
 function bindText(id, read, apply, required=false){
   const element=$('#'+id);let checkpoint=false;
   element.onfocus=()=>{checkpoint=false;};
@@ -292,20 +292,20 @@ function renderInspector(force=false){
     if(!item){selected=null;return renderInspector(true);}
     renderComponentInspector(kind,item);
   }else if(selected?.type==='nodes'){
-    panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">COMPONENTS</span></div><h2>${selectedNodeIDs().length} 個を選択</h2><button class="wide-button danger" id="delete-selected">選択したコンポーネントを削除</button><button class="wide-button" id="capture-template">選択した構成を原型に登録</button>`;
+    panel.innerHTML=i18n.html`<div class="inspector-heading"><span class="eyebrow">COMPONENTS</span></div><h2>${selectedNodeIDs().length} 個を選択</h2><button class="wide-button danger" id="delete-selected">選択したコンポーネントを削除</button><button class="wide-button" id="capture-template">選択した構成を原型に登録</button>`;
     $('#capture-template').onclick=()=>captureTemplateDialog(selectedNodeIDs());
   }else{
-    panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">PROJECT OVERVIEW</span></div>${field('プロジェクト名','project-name',graph.name)}${field('全体で実現したいこと','project-description',graph.description,{textarea:true})}${root?`<p class="artifact" style="margin-top:20px">${esc(root)}</p><button class="wide-button" id="copy-location">プロジェクトのパスをコピー</button>`:''}`;
+    panel.innerHTML=i18n.html`<div class="inspector-heading"><span class="eyebrow">PROJECT OVERVIEW</span></div>${field(i18n.t('プロジェクト名'),'project-name',graph.name)}${field(i18n.t('全体で実現したいこと'),'project-description',graph.description,{textarea:true})}${root?i18n.html`<p class="artifact" style="margin-top:20px">${esc(root)}</p><button class="wide-button" id="copy-location">プロジェクトのパスをコピー</button>`:''}`;
     bindText('project-name',()=>graph.name,value=>{graph.name=value;},true);
     bindText('project-description',()=>graph.description,value=>{graph.description=value;for(const id in reports)reports[id]={...reports[id],status:'stale'};for(const id in nodeReports)nodeReports[id]={...nodeReports[id],status:'stale'};});
-    if($('#copy-location'))$('#copy-location').onclick=safe(async()=>{await call('copy',{text:root});toast('パスをコピーしました。');});
+    if($('#copy-location'))$('#copy-location').onclick=safe(async()=>{await call('copy',{text:root});toast(i18n.t('パスをコピーしました。'));});
   }
   if($('#delete-selected'))$('#delete-selected').onclick=safe(deleteSelected);
   if(selectedNodeIDs().length){
-    panel.insertAdjacentHTML('beforeend','<button class="wide-button component-appearance-action" id="node-appearance-action">見た目を変更…</button>');
+    panel.insertAdjacentHTML('beforeend',i18n.t('<button class="wide-button component-appearance-action" id="node-appearance-action">見た目を変更…</button>'));
     $('#node-appearance-action').onclick=openNodeAppearance;
   }else if(selected?.type==='edge'){
-    panel.insertAdjacentHTML('beforeend','<button class="wide-button component-appearance-action" id="edge-appearance-action">見た目を変更…</button>');
+    panel.insertAdjacentHTML('beforeend',i18n.t('<button class="wide-button component-appearance-action" id="edge-appearance-action">見た目を変更…</button>'));
     $('#edge-appearance-action').onclick=()=>appearanceSettings(selected.id);
   }
 }
@@ -314,9 +314,9 @@ function renderComponentInspector(kind,item){
   const state=item.implementationState??(['implemented','verified'].includes(report?.status)?'existing':'planned');
   const name=isNode?'name':'label',description=isNode?'description':'intent',type=isNode?'kind':'mode';
   const types=isNode?Object.fromEntries(Object.keys(symbols).map(k=>[k,k])):{data:'data',request:'request / response',event:'event'};
-  const options=(values,current)=>Object.entries(values).map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(label)}</option>`).join('');
+  const options=(values,current)=>Object.entries(values).map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(i18n.t(label))}</option>`).join('');
   const panel=$('#inspector');
-  panel.innerHTML=`<div class="inspector-heading"><span class="eyebrow">COMPONENT · ${isNode?'NODE':'EDGE'}</span></div>${field('Component Name',kind+'-'+name,item[name])}<label class="field"><span>Mutability</span><select id="design-policy">${options({mutable:'mutable',immutable:'immutable'},locked?'immutable':'mutable')}</select></label><label class="field"><span>Implementation</span><select id="${kind}-implementation">${options({planned:'not implemented',existing:'implemented'},['existing','verified'].includes(state)?'existing':'planned')}</select></label><label class="field"><span>Component Type</span><select id="${kind}-${type}">${options(types,item[type])}</select></label>${field('Access',kind+'-path',item.path||'')}<button class="wide-button" id="set-component-path">Browse…</button>${field('Description',kind+'-'+description,item[description],{textarea:true})}`;
+  panel.innerHTML=i18n.html`<div class="inspector-heading"><span class="eyebrow">COMPONENT · ${i18n.t(isNode?'NODE':'EDGE')}</span></div>${field('Component Name',kind+'-'+name,item[name])}<label class="field"><span>Mutability</span><select id="design-policy">${options({mutable:'mutable',immutable:'immutable'},locked?'immutable':'mutable')}</select></label><label class="field"><span>Implementation</span><select id="${kind}-implementation">${options({planned:'not implemented',existing:'implemented'},['existing','verified'].includes(state)?'existing':'planned')}</select></label><label class="field"><span>Component Type</span><select id="${kind}-${type}">${options(types,item[type])}</select></label>${field('Access',kind+'-path',item.path||'')}<button class="wide-button" id="set-component-path">Browse…</button>${field('Description',kind+'-'+description,item[description],{textarea:true})}`;
   const invalidate=()=>isNode?invalidateEdges(item.id):invalidateEdges(null,item.id);
   for(const prop of [name,'path',description])bindText(kind+'-'+prop,()=>item[prop]||'',value=>{item[prop]=value;invalidate();},prop===name);
   $('#'+kind+'-path').placeholder='/path/to/component, https://…, IP address';$('#'+kind+'-path').spellcheck=false;
@@ -329,24 +329,24 @@ function renderComponentInspector(kind,item){
   $('#set-component-path').onclick=safe(async()=>{const paths=await call('chooseNodes');if(paths.length){const value=await call('inspect',{path:paths[0]});mutate(()=>{item.path=value.path;if(!item[description])item[description]=value.description;invalidate();});}});
   if(!isNode){
     const a=graph.nodes.find(n=>n.id===item.source),b=graph.nodes.find(n=>n.id===item.target);
-    panel.insertAdjacentHTML('beforeend',`<p class="subtle">${esc(a?.name||'未接続')} ${item.mode==='request'?'↔':'→'} ${esc(b?.name||'未接続')}</p>`);
+    panel.insertAdjacentHTML('beforeend',`<p class="subtle">${esc(a?.name||i18n.t('未接続'))} ${item.mode==='request'?'↔':'→'} ${esc(b?.name||i18n.t('未接続'))}</p>`);
   }
   const reportStatus=report?.status||'pending';
-  panel.insertAdjacentHTML('beforeend',`<button class="primary wide-button" id="${kind}-handoff">↗ このコンポーネントをエージェントに渡す</button><button class="wide-button" id="${kind}-details">${isNode?'ノード':'接続'}の詳細…</button><div class="status-card ${esc(reportStatus)}"><strong>実装レポート · ${report?statusNames[reportStatus]||'確認が必要':'未報告'}</strong>${report?.summary?`<p>${esc(report.summary)}</p>`:''}</div>${report?`<details class="report-checks"><summary>エージェントの確認記録</summary><pre class="artifact">${[...(Array.isArray(report.checks)?report.checks:[]),...(Array.isArray(report.files)?report.files:[])].map(v=>esc(v)).join('\n')}</pre></details>`:''}`);
+  panel.insertAdjacentHTML('beforeend',i18n.html`<button class="primary wide-button" id="${kind}-handoff">↗ このコンポーネントをエージェントに渡す</button><button class="wide-button" id="${kind}-details">${isNode?i18n.t('ノード'):i18n.t('接続')}の詳細…</button><div class="status-card ${esc(reportStatus)}"><strong>実装レポート · ${report?statusNames[reportStatus]||i18n.t('確認が必要'):i18n.t('未報告')}</strong>${report?.summary?`<p>${esc(report.summary)}</p>`:''}</div>${report?i18n.html`<details class="report-checks"><summary>エージェントの確認記録</summary><pre class="artifact">${[...(Array.isArray(report.checks)?report.checks:[]),...(Array.isArray(report.files)?report.files:[])].map(v=>esc(v)).join('\n')}</pre></details>`:''}`);
   $('#'+kind+'-handoff').onclick=safe(()=>isNode?handoffNode(item.id):handoff(item.id));
   $('#'+kind+'-details').onclick=()=>isNode?openNodeDetails(item):openEdgeDetails(item);
-  panel.insertAdjacentHTML('beforeend','<div class="component-actions"><button id="capture-template">原型に登録</button><button class="danger" id="delete-selected">削除</button></div>');
+  panel.insertAdjacentHTML('beforeend',i18n.t('<div class="component-actions"><button id="capture-template">原型に登録</button><button class="danger" id="delete-selected">削除</button></div>'));
   $('#capture-template').onclick=()=>captureTemplateDialog(isNode?[item.id]:[item.source,item.target],item.policy==='template');
   if(locked)for(const control of $$('input,textarea,select,#set-component-path,#delete-selected',panel))if(control.id!=='design-policy')control.disabled=true;
 }
 function openNodeDetails(item){
-  modal(`<h2>ノードの詳細</h2><div id="node-details-content">${field('設計指示 / variantでの差異','design-instructions',item.designInstructions||'',{textarea:true})}${field('起動・呼び出し方法','node-command',item.command)}${field('入力ポート','node-inputs',item.inputs.join(', '),{hint:'カンマ区切り'})}${field('出力ポート','node-outputs',item.outputs.join(', '),{hint:'カンマ区切り'})}</div><div class="modal-actions"><button>閉じる</button></div>`);
+  modal(i18n.html`<h2>ノードの詳細</h2><div id="node-details-content">${field(i18n.t('設計指示 / variantでの差異'),'design-instructions',item.designInstructions||'',{textarea:true})}${field(i18n.t('起動・呼び出し方法'),'node-command',item.command)}${field(i18n.t('入力ポート'),'node-inputs',item.inputs.join(', '),{hint:i18n.t('カンマ区切り')})}${field(i18n.t('出力ポート'),'node-outputs',item.outputs.join(', '),{hint:i18n.t('カンマ区切り')})}</div><div class="modal-actions"><button>閉じる</button></div>`);
   for(const [id,prop] of [['design-instructions','designInstructions'],['node-command','command']])bindText(id,()=>item[prop]||'',value=>{item[prop]=value;invalidateEdges(item.id);});
   for(const prop of ['inputs','outputs'])$('#node-'+prop).onchange=event=>{
     if(design.locked(item))return;
     const ports=[...new Set(event.target.value.split(',').map(s=>s.trim()).filter(Boolean))];
     const affected=graph.edges.some(edge=>prop==='inputs'?edge.target===item.id&&!ports.includes(edge.targetPort):edge.source===item.id&&!ports.includes(edge.sourcePort));
-    if(ports.length>30||ports.some(p=>p.length>100)||affected){toast(affected?'接続中のポートは削除・改名できません。':'ポートは30個まで、名前は100文字以内にしてください。',true);event.target.value=item[prop].join(', ');return;}
+    if(ports.length>30||ports.some(p=>p.length>100)||affected){toast(affected?i18n.t('接続中のポートは削除・改名できません。'):i18n.t('ポートは30個まで、名前は100文字以内にしてください。'),true);event.target.value=item[prop].join(', ');return;}
     mutate(()=>{item[prop]=ports;invalidateEdges(item.id);},{inspector:false});
   };
   if(design.locked(item))for(const control of $$('#node-details-content input,#node-details-content textarea'))control.disabled=true;
@@ -355,16 +355,26 @@ async function handoffNode(nodeID){
   document.activeElement?.blur();
   if(!await save(true))return;
   const prompt=await call('copyPrompt',{nodeID});
-  modal(`<h2>依頼文をコピーしました</h2><pre>${esc(prompt)}</pre><div class="modal-actions"><button>閉じる</button><button type="button" id="copy-again" class="primary">もう一度コピー</button></div>`);
-  $('#copy-again').onclick=safe(async()=>{await call('copy',{text:prompt});toast('依頼文をコピーしました。');});
+  modal(i18n.html`<h2>依頼文をコピーしました</h2><pre>${esc(prompt)}</pre><div class="modal-actions"><button>閉じる</button><button type="button" id="copy-again" class="primary">もう一度コピー</button></div>`);
+  $('#copy-again').onclick=safe(async()=>{await call('copy',{text:prompt});toast(i18n.t('依頼文をコピーしました。'));});
 }
 function openEdgeDetails(item){
-  modal(`<h2>接続の詳細</h2><div id="edge-details-content">${field('設計指示 / variantでの差異','design-instructions',item.designInstructions||'',{textarea:true})}</div><div class="modal-actions"><button>閉じる</button></div>`);
+  modal(i18n.html`<h2>接続の詳細</h2><div id="edge-details-content">${field(i18n.t('設計指示 / variantでの差異'),'design-instructions',item.designInstructions||'',{textarea:true})}</div><div class="modal-actions"><button>閉じる</button></div>`);
   const panel=$('#edge-details-content');
   bindText('design-instructions',()=>item.designInstructions||'',value=>{item.designInstructions=value;invalidateEdges(null,item.id);});
   renderWorkflowInspector(panel);
   if(design.locked(item))for(const control of $$('input,textarea,select,button',panel))control.disabled=true;
 }
+async function changeLanguage(language){
+  if(language===i18n.language)return;
+  document.activeElement?.blur();
+  if(native)await call('setLanguage',{language});
+  if(!i18n.setLanguage(language)&&!native)toast(i18n.t('言語設定を保存できませんでした。'),true);
+}
+window.addEventListener('languagechange',()=>{
+  finishDrag(true);clearConnection(false);render(true);updateExternalBanner();
+  $('#toast').hidden=true;$('#status-text').textContent='';
+});
 function appearanceSettings(edgeID=null){
   const edge=edgeID?graph.edges.find(e=>e.id===edgeID):null;
   let settings=edge?.appearance?appearance.normalize(edge.appearance):{...edgeAppearance};
@@ -372,7 +382,8 @@ function appearanceSettings(edgeID=null){
   const options=(values,current)=>Object.entries(values).map(([value,label])=>`<option value="${value}" ${value===current?'selected':''}>${label}</option>`).join('');
   const colour=(name,label)=>`<label class="field"><span>${label}</span><input type="color" data-appearance="${name}" value="${s[name]}"></label>`;
   const slider=(name,label,min,max,step=1)=>`<label class="field"><span>${label} <output data-output="${name}">${s[name]}</output></span><input type="range" data-appearance="${name}" min="${min}" max="${max}" step="${step}" value="${s[name]}"></label>`;
-  modal(`<h2>${edge?esc(edge.label)+' · 見た目':'設定'}</h2><span class="eyebrow">エッジの表示</span><div class="edge-preview"><div><span>out</span><span>in</span></div><svg id="appearance-preview" viewBox="0 0 440 110" role="img" aria-label="出力から入力へのエッジ表示プレビュー"></svg></div><label class="field"><span>表示方式</span><select data-appearance="style">${options({gradient:'グラデーション',pattern:'模様',both:'グラデーション＋模様',solid:'状態色（従来の表示）'},s.style)}</select></label><div class="appearance-colours">${colour('source','out 側の色')}${colour('target','in 側の色')}${colour('patternColour','模様の色')}</div><label class="field"><span>模様</span><select data-appearance="pattern">${options({chevrons:'山形 › › ›',taper:'先細りのストライプ'},s.pattern)}</select></label><div class="field-row">${slider('width','線の太さ',1,8,.5)}${slider('spacing','模様の間隔',20,120)}</div>${slider('size','模様の大きさ',3,12)}<label class="appearance-checkbox"><input type="checkbox" data-appearance="arrows" ${s.arrows?'checked':''}>矢印を表示</label><div class="modal-actions"><button type="button" id="reset-appearance">${edge?'全体の設定に戻す':'初期設定に戻す'}</button><button class="primary">閉じる</button></div>`);
+  modal(i18n.html`<h2>${edge?esc(edge.label)+i18n.t(' · 見た目'):i18n.t('設定')}</h2>${!edge?`<label class="field"><span>Language / 言語</span><select id="ui-language" aria-label="Language / 言語"><option value="ja" ${i18n.language==='ja'?'selected':''}>日本語</option><option value="en" ${i18n.language==='en'?'selected':''}>English</option></select></label>`:''}<span class="eyebrow">エッジの表示</span><div class="edge-preview"><div><span>out</span><span>in</span></div><svg id="appearance-preview" viewBox="0 0 440 110" role="img" aria-label="出力から入力へのエッジ表示プレビュー"></svg></div><label class="field"><span>表示方式</span><select data-appearance="style">${options({gradient:i18n.t('グラデーション'),pattern:i18n.t('模様'),both:i18n.t('グラデーション＋模様'),solid:i18n.t('状態色（従来の表示）')},s.style)}</select></label><div class="appearance-colours">${colour('source',i18n.t('out 側の色'))}${colour('target',i18n.t('in 側の色'))}${colour('patternColour',i18n.t('模様の色'))}</div><label class="field"><span>模様</span><select data-appearance="pattern">${options({chevrons:i18n.t('山形 › › ›'),taper:i18n.t('先細りのストライプ')},s.pattern)}</select></label><div class="field-row">${slider('width',i18n.t('線の太さ'),1,8,.5)}${slider('spacing',i18n.t('模様の間隔'),20,120)}</div>${slider('size',i18n.t('模様の大きさ'),3,12)}<label class="appearance-checkbox"><input type="checkbox" data-appearance="arrows" ${s.arrows?'checked':''}>矢印を表示</label><div class="modal-actions"><button type="button" id="reset-appearance">${edge?i18n.t('全体の設定に戻す'):i18n.t('初期設定に戻す')}</button><button class="primary">閉じる</button></div>`);
+  if($('#ui-language'))$('#ui-language').onchange=safe(async event=>{await changeLanguage(event.target.value);appearanceSettings();$('#ui-language').focus();});
   const preview=()=>{
     $('#appearance-preview').innerHTML=appearance.render({x:18,y:80},{x:420,y:28},{settings,id:'settings-preview'});
     const gradient=['gradient','both'].includes(settings.style),pattern=['pattern','both'].includes(settings.style);
@@ -385,22 +396,22 @@ function appearanceSettings(edgeID=null){
     const value=input.type==='checkbox'?input.checked:input.type==='range'?Number(input.value):input.value;
     settings=appearance.normalize({...settings,[input.dataset.appearance]:value});
     if(edge)mutate(()=>{graph.edges.find(e=>e.id===edgeID).appearance={...settings};},{inspector:false});
-    else{edgeAppearance=settings;try{appearance.save(edgeAppearance);}catch{toast('表示設定を保存できませんでした。',true);}}
+    else{edgeAppearance=settings;try{appearance.save(edgeAppearance);}catch{toast(i18n.t('表示設定を保存できませんでした。'),true);}}
     preview();renderEdges();
   }));
-  $('#reset-appearance').onclick=()=>{if(edge){mutate(()=>{delete graph.edges.find(e=>e.id===edgeID).appearance;},{inspector:false});appearanceSettings(edgeID);return;}edgeAppearance={...appearance.defaults};try{appearance.save(edgeAppearance);}catch{toast('表示設定を保存できませんでした。',true);}appearanceSettings();renderEdges();};
+  $('#reset-appearance').onclick=()=>{if(edge){mutate(()=>{delete graph.edges.find(e=>e.id===edgeID).appearance;},{inspector:false});appearanceSettings(edgeID);return;}edgeAppearance={...appearance.defaults};try{appearance.save(edgeAppearance);}catch{toast(i18n.t('表示設定を保存できませんでした。'),true);}appearanceSettings();renderEdges();};
   preview();
 }
 function modal(html){const d=$('#modal');$('#modal-content').innerHTML=html;if(!d.open)d.showModal();}
 async function confirmChoice(message){return new Promise(resolve=>{
-  modal(`<h2>変更を確認</h2><p>${esc(message)}</p><div class="modal-actions"><button value="cancel">キャンセル</button><button value="confirm" class="primary">続ける</button></div>`);
+  modal(i18n.html`<h2>変更を確認</h2><p>${esc(message)}</p><div class="modal-actions"><button value="cancel">キャンセル</button><button value="confirm" class="primary">続ける</button></div>`);
   $('#modal').addEventListener('close',()=>resolve($('#modal').returnValue==='confirm'),{once:true});$('#modal').returnValue='cancel';
 });}
 async function deleteSelected(){
   if(!selected)return;
   const item=clone(selected),ids=new Set(selectedNodeIDs());
   if(ids.size&&graph.edges.some(e=>ids.has(e.source)||ids.has(e.target))){
-    if(!await confirmChoice(`${ids.size} 個のコンポーネントと、それにつながる接続を削除します。生成済みの実装ファイルは保持されます。`))return;
+    if(!await confirmChoice(i18n.html`${ids.size} 個のコンポーネントと、それにつながる接続を削除します。生成済みの実装ファイルは保持されます。`))return;
   }
   mutate(()=>{
     if(ids.size){graph.nodes=graph.nodes.filter(n=>!ids.has(n.id));graph.edges=graph.edges.filter(e=>!ids.has(e.source)&&!ids.has(e.target));}
@@ -418,15 +429,15 @@ function addDialog({point,connection}={}){
         const incoming=connection.moving==='target',ports=incoming?n.inputs:n.outputs;
         if(!ports.length)ports.push(incoming?'in':'out');
         const f=connection.fixed;
-        graph.edges.push({id:uid('edge'),source:incoming?f.node:n.id,sourcePort:incoming?f.port:ports[0],target:incoming?n.id:f.node,targetPort:incoming?ports[0]:f.port,layer:connection.layer,label:'新しい接続',intent:'',mode:'data',policy:'mutable',designInstructions:''});
+        graph.edges.push({id:uid('edge'),source:incoming?f.node:n.id,sourcePort:incoming?f.port:ports[0],target:incoming?n.id:f.node,targetPort:incoming?ports[0]:f.port,layer:connection.layer,label:i18n.t('新しい接続'),intent:'',mode:'data',policy:'mutable',designInstructions:''});
       }
       selected={type:'node',id:n.id};
     }
   });
-  modal(`<h2>コンポーネントを追加</h2>${connection?'<p>追加したノードにそのまま接続します。</p>':''}<button type="button" class="option" id="dialog-folder"><span class="option-icon">▧</span><span><strong>ローカルのフォルダ / ファイル</strong></span></button><button type="button" class="option" id="dialog-url"><span class="option-icon">⌘</span><span><strong>リポジトリ URL / パス</strong></span></button><button type="button" class="option" id="dialog-note"><span class="option-icon">◇</span><span><strong>空のコンポーネント</strong></span></button><div class="modal-actions"><button>閉じる</button></div>`);
+  modal(i18n.html`<h2>コンポーネントを追加</h2>${connection?i18n.t('<p>追加したノードにそのまま接続します。</p>'):''}<button type="button" class="option" id="dialog-folder"><span class="option-icon">▧</span><span><strong>ローカルのフォルダ / ファイル</strong></span></button><button type="button" class="option" id="dialog-url"><span class="option-icon">⌘</span><span><strong>リポジトリ URL / パス</strong></span></button><button type="button" class="option" id="dialog-note"><span class="option-icon">◇</span><span><strong>空のコンポーネント</strong></span></button><div class="modal-actions"><button>閉じる</button></div>`);
   $('#dialog-folder').onclick=safe(async()=>{const paths=await call('chooseNodes');if(!paths.length)return;const values=await Promise.all(paths.map(path=>call('inspect',{path})));add(values);$('#modal').close();});
-  $('#dialog-note').onclick=()=>{add([{kind:'note',name:'新しいモジュール'}]);$('#modal').close();};
-  $('#dialog-url').onclick=()=>{modal(`<h2>参照先を追加</h2>${field('絶対パス、またはリポジトリ URL','path-entry','')}<div class="modal-actions"><button>キャンセル</button><button type="button" class="primary" id="add-reference">追加</button></div>`);$('#path-entry').focus();$('#add-reference').onclick=safe(async()=>{const value=$('#path-entry').value.trim();if(!value)return;const info=await call('inspect',{path:value});add([info]);$('#modal').close();});};
+  $('#dialog-note').onclick=()=>{add([{kind:'note',name:i18n.t('新しいモジュール')}]);$('#modal').close();};
+  $('#dialog-url').onclick=()=>{modal(i18n.html`<h2>参照先を追加</h2>${field(i18n.t('絶対パス、またはリポジトリ URL'),'path-entry','')}<div class="modal-actions"><button>キャンセル</button><button type="button" class="primary" id="add-reference">追加</button></div>`);$('#path-entry').focus();$('#add-reference').onclick=safe(async()=>{const value=$('#path-entry').value.trim();if(!value)return;const info=await call('inspect',{path:value});add([info]);$('#modal').close();});};
 }
 function isBlankDrop(event){
   const r=$('#canvas').getBoundingClientRect(),p=canvasPoint(event.clientX,event.clientY);
@@ -442,7 +453,7 @@ function dropConnectionOnBlank(event){
   }
 }
 
-async function handoff(edgeID,skipCheck=false){document.activeElement?.blur();if(!skipCheck&&workflow.check(graph,edgeID).length){showDesignCheck(edgeID,true);return;}if(!await save(true))return;const prompt=await call('copyPrompt',{edgeID});modal(`<h2>依頼文をコピーしました</h2><pre>${esc(prompt)}</pre><div class="modal-actions"><button>閉じる</button><button type="button" id="copy-again" class="primary">もう一度コピー</button></div>`);$('#copy-again').onclick=safe(async()=>{await call('copy',{text:prompt});toast('依頼文をコピーしました。');});}
+async function handoff(edgeID,skipCheck=false){document.activeElement?.blur();if(!skipCheck&&workflow.check(graph,edgeID).length){showDesignCheck(edgeID,true);return;}if(!await save(true))return;const prompt=await call('copyPrompt',{edgeID});modal(i18n.html`<h2>依頼文をコピーしました</h2><pre>${esc(prompt)}</pre><div class="modal-actions"><button>閉じる</button><button type="button" id="copy-again" class="primary">もう一度コピー</button></div>`);$('#copy-again').onclick=safe(async()=>{await call('copy',{text:prompt});toast(i18n.t('依頼文をコピーしました。'));});}
 function exampleGraph(){
   return {
   "schemaVersion": 1,
@@ -719,12 +730,12 @@ function exampleGraph(){
 };
 }
 
-async function replaceDraft(next){if(dirty&&!root&&!await confirmChoice('現在の未保存のグラフを置き換えます。'))return;if(root&&dirty){if(!await save(true))return;}clearConnection(false);historyState={};savedGraph=null;pendingExternal=null;changeOverlay=null;overlayFiles=null;root='';revision='';reports={};fingerprints={};selected=null;external=false;$('#external-banner').hidden=true;undoStack=[];redoStack=[];graph=next;markDirty();render();fit();}
+async function replaceDraft(next){if(dirty&&!root&&!await confirmChoice(i18n.t('現在の未保存のグラフを置き換えます。')))return;if(root&&dirty){if(!await save(true))return;}clearConnection(false);historyState={};savedGraph=null;pendingExternal=null;changeOverlay=null;overlayFiles=null;root='';revision='';reports={};fingerprints={};selected=null;external=false;$('#external-banner').hidden=true;undoStack=[];redoStack=[];graph=next;markDirty();render();fit();}
 async function poll(){if(!root||saveTask)return;try{const state=await call('poll');if(state.externalChange){external=true;pendingExternal=state;updateExternalBanner();clearTimeout(saveTimer);return;}
  if(external){external=false;pendingExternal=null;changeOverlay=null;overlayFiles=null;updateExternalBanner();if(dirty){clearTimeout(saveTimer);saveTimer=setTimeout(()=>save(false).catch(e=>toast(e.message,true)),850);}}
  if(dirty||drag||connecting)return;
  if(JSON.stringify(state.history)!==JSON.stringify(historyState)){historyState=state.history||{};changeOverlay=null;overlayFiles=null;applyChangeOverlay();updateHeader();}
- if(JSON.stringify(reports)!==JSON.stringify(state.reports||{})||JSON.stringify(nodeReports)!==JSON.stringify(state.nodeReports||{})){reports=state.reports||{};fingerprints=state.fingerprints||{};nodeReports=state.nodeReports||{};nodeFingerprints=state.nodeFingerprints||{};updateHeader();renderEdges();if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||''))renderInspector(true);$('#status-text').textContent='実装レポートを更新しました。';}
+ if(JSON.stringify(reports)!==JSON.stringify(state.reports||{})||JSON.stringify(nodeReports)!==JSON.stringify(state.nodeReports||{})){reports=state.reports||{};fingerprints=state.fingerprints||{};nodeReports=state.nodeReports||{};nodeFingerprints=state.nodeFingerprints||{};updateHeader();renderEdges();if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||''))renderInspector(true);$('#status-text').textContent=i18n.t('実装レポートを更新しました。');}
 }catch(e){$('#status-text').textContent=e.message;}}
 $('#canvas').addEventListener('pointerdown',e=>{
   if(drag||e.button>1||e.target.closest('button,.canvas-controls'))return;
@@ -791,19 +802,23 @@ $('#canvas').addEventListener('wheel',e=>{e.preventDefault();if(drag||connecting
 $('#canvas').addEventListener('dragover',e=>{e.preventDefault();$('#canvas').classList.add('drag-over');});
 $('#canvas').addEventListener('dragleave',()=>$('#canvas').classList.remove('drag-over'));
 $('#canvas').addEventListener('drop',safe(async e=>{e.preventDefault();$('#canvas').classList.remove('drag-over');const text=e.dataTransfer.getData('text/uri-list')||e.dataTransfer.getData('text/plain');if(text&&/^https?:\/\//.test(text))await addPaths([text.trim()],canvasPoint(e.clientX,e.clientY));}));
-host.on('drop',safe(async detail=>{const r=$('#canvas').getBoundingClientRect();$('#canvas').classList.remove('drag-over');if(detail.x<r.left||detail.x>r.right||detail.y<r.top||detail.y>r.bottom){toast('中央のキャンバスにドロップしてください。');return;}await addPaths(detail.paths,canvasPoint(detail.x,detail.y));})).catch(e=>toast(e.message,true));
+host.on('drop',safe(async detail=>{const r=$('#canvas').getBoundingClientRect();$('#canvas').classList.remove('drag-over');if(detail.x<r.left||detail.x>r.right||detail.y<r.top||detail.y>r.bottom){toast(i18n.t('中央のキャンバスにドロップしてください。'));return;}await addPaths(detail.paths,canvasPoint(detail.x,detail.y));})).catch(e=>toast(e.message,true));
 host.on('error',message=>toast(message,true)).catch(e=>toast(e.message,true));
-function undo(){clearConnection(false);if(!undoStack.length)return;redoStack.push(clone(graph));const next=undoStack[undoStack.length-1];if(design.violations(graph,next).length){redoStack.pop();toast('保護された設計はUndoできません。先に保護を解除してください。',true);return;}graph=undoStack.pop();selected=null;markDirty();render();}
-function redo(){clearConnection(false);if(!redoStack.length)return;undoStack.push(clone(graph));const next=redoStack[redoStack.length-1];if(design.violations(graph,next).length){undoStack.pop();toast('保護された設計はRedoできません。先に保護を解除してください。',true);return;}graph=redoStack.pop();selected=null;markDirty();render();}
+function undo(){clearConnection(false);if(!undoStack.length)return;redoStack.push(clone(graph));const next=undoStack[undoStack.length-1];if(design.violations(graph,next).length){redoStack.pop();toast(i18n.t('保護された設計はUndoできません。先に保護を解除してください。'),true);return;}graph=undoStack.pop();selected=null;markDirty();render();}
+function redo(){clearConnection(false);if(!redoStack.length)return;undoStack.push(clone(graph));const next=redoStack[redoStack.length-1];if(design.violations(graph,next).length){undoStack.pop();toast(i18n.t('保護された設計はRedoできません。先に保護を解除してください。'),true);return;}graph=redoStack.pop();selected=null;markDirty();render();}
 $('#zoom-in').onclick=()=>zoomBy(1.2);$('#zoom-out').onclick=()=>zoomBy(1/1.2);$('#fit-view').onclick=fit;$('#undo').onclick=undo;$('#redo').onclick=redo;
 $('#add-node').onclick=addDialog;$('#empty-add').onclick=safe(chooseNodes);$('#save-project').onclick=safe(()=>save(true));$('#handoff').onclick=safe(()=>handoff());
 $('#new-project').onclick=safe(()=>replaceDraft(emptyGraph()));$('#load-example').onclick=safe(()=>replaceDraft(exampleGraph()));
 $('#project-settings').onclick=()=>{selected=null;render();};$('#reveal-project').onclick=safe(()=>call('reveal'));
-$('#open-project').onclick=safe(async()=>{document.activeElement?.blur();if(dirty){if(root){if(!await save(true))return;}else if(!await confirmChoice('未保存のグラフを破棄して別のプロジェクトを開きます。'))return;}const state=await call('openProject');if(state){clearTimeout(saveTimer);cleanState(state);fit();}});
-$('#reload-project').onclick=safe(async()=>{if(dirty&&!await confirmChoice('未保存の編集を破棄して、ディスクのグラフを読み込みます。必要なら先に JSON 書き出しで退避してください。'))return;clearTimeout(saveTimer);cleanState(await call('reload'));fit();});
+$('#open-project').onclick=safe(async()=>{document.activeElement?.blur();if(dirty){if(root){if(!await save(true))return;}else if(!await confirmChoice(i18n.t('未保存のグラフを破棄して別のプロジェクトを開きます。')))return;}const state=await call('openProject');if(state){clearTimeout(saveTimer);cleanState(state);fit();}});
+$('#reload-project').onclick=safe(async()=>{if(dirty&&!await confirmChoice(i18n.t('未保存の編集を破棄して、ディスクのグラフを読み込みます。必要なら先に JSON 書き出しで退避してください。')))return;clearTimeout(saveTimer);cleanState(await call('reload'));fit();});
 $('#export-draft').onclick=safe(()=>call('exportJSON',{graph}));
 $('#appearance-settings').onclick=()=>appearanceSettings();
-$('#show-help').onclick=()=>modal(`<h2>ヘルプ</h2><p>Shift＋クリック：追加選択 / 解除<br>選択した線の接点をドラッグ：付け替え<br>ポートの近くで離す：吸着して接続<br>新しい線を空白で離す：ノードを追加して接続<br>付け替え中に空白で離す：仕様を残して未接続にする<br>Esc：接続操作をキャンセル<br>空白をドラッグ：四角で囲ったノードを選択<br>Shift＋範囲選択：選択に追加<br>Space＋ドラッグ / 中ボタンドラッグ：画面を移動<br>Delete：選択したノード・接続を削除</p><p>① フォルダを配置し、右の出力から左の入力へ線を引きます。<br>② 線を選んで、つなぎたい内容を記入します。<br>③ 保存して「エージェントに渡す」を押します。<br>④ コピーした依頼文を、ローカルファイルにアクセスできる ChatGPT / Codex / Claude Code のチャットへ貼り付けます。</p><pre>graph.json                  設計の正本\nAGENT_BRIEF.md              エージェントへの指示\nconnections/&lt;id&gt;/SPEC.md    接続ごとの仕様\nimplementations/&lt;id&gt;/       生成コードの保存先\nreports/&lt;id&gt;.json          実装・検証の報告\ngraph.mmd                   Mermaid のグラフ</pre><p>保存済みプロジェクトの編集は自動保存されます。エージェントのレポートは約2秒ごとに読み込みます。元のリポジトリの更新は自動検知しないため、コードを変えた際は再検証を依頼してください。</p><div class="modal-actions"><button class="primary">わかりました</button></div>`);
+$('#show-tutorial').onclick=()=>window.gacchankoTutorial.open();
+$('#empty-tutorial').onclick=()=>window.gacchankoTutorial.open();
+$('#show-help').onclick=()=>{modal(i18n.html`<h2>ヘルプ</h2><button type="button" id="help-tutorial" class="primary wide-button">チュートリアル</button><p>Shift＋クリック：追加選択 / 解除<br>選択した線の接点をドラッグ：付け替え<br>ポートの近くで離す：吸着して接続<br>新しい線を空白で離す：ノードを追加して接続<br>付け替え中に空白で離す：仕様を残して未接続にする<br>Esc：接続操作をキャンセル<br>空白をドラッグ：四角で囲ったノードを選択<br>Shift＋範囲選択：選択に追加<br>Space＋ドラッグ / 中ボタンドラッグ：画面を移動<br>Delete：選択したノード・接続を削除</p><p>① フォルダを配置し、右の出力から左の入力へ線を引きます。<br>② 線を選んで、つなぎたい内容を記入します。<br>③ 保存して「エージェントに渡す」を押します。<br>④ コピーした依頼文を、ローカルファイルにアクセスできる ChatGPT / Codex / Claude Code のチャットへ貼り付けます。</p><pre>graph.json                  設計の正本\nAGENT_BRIEF.md              エージェントへの指示\nconnections/&lt;id&gt;/SPEC.md    接続ごとの仕様\nimplementations/&lt;id&gt;/       生成コードの保存先\nreports/&lt;id&gt;.json          実装・検証の報告\ngraph.mmd                   Mermaid のグラフ</pre><p>保存済みプロジェクトの編集は自動保存されます。エージェントのレポートは約2秒ごとに読み込みます。元のリポジトリの更新は自動検知しないため、コードを変えた際は再検証を依頼してください。</p><div class="modal-actions"><button class="primary">わかりました</button></div>`);
+  $('#help-tutorial').onclick=()=>window.gacchankoTutorial.open();
+};
 window.addEventListener('keydown',e=>{
   const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'');
   if(e.key==='Escape'){finishDrag(true);clearConnection();}
@@ -812,14 +827,14 @@ window.addEventListener('keydown',e=>{
   if(e.metaKey&&e.key.toLowerCase()==='o'){e.preventDefault();$('#open-project').click();}
   if(!typing&&!$('#modal').open&&!drag&&!connecting){if(e.metaKey&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}if(['Backspace','Delete'].includes(e.key)){e.preventDefault();safe(deleteSelected)();}if(e.key.toLowerCase()==='f')fit();}
 });
-window.gacchanko={call,get graph(){return graph;},get root(){return root;},get reports(){return reports;},get nodeReports(){return nodeReports;},makeNode,mutate,createConnection,select,save,poll,cleanState,fit,render,exampleGraph,addPaths,undo,redo,status,replaceDraft,handoff};
-async function init(){render();if(native){const state=await call('state');if(state.project){cleanState(state);fit();}else{try{const backup=JSON.parse(localStorage.getItem('gacchanko-draft')||'null');if(backup?.graph&&await confirmChoice('前回の未保存の編集を復元しますか？')){graph=backup.graph;root='';revision='';markDirty();render();fit();}}catch(e){toast(e.message,true);}}}setInterval(poll,2000);}
+window.gacchanko={call,get graph(){return graph;},get root(){return root;},get reports(){return reports;},get nodeReports(){return nodeReports;},makeNode,mutate,createConnection,select,save,poll,cleanState,fit,render,exampleGraph,addPaths,undo,redo,status,replaceDraft,handoff,changeLanguage};
+async function init(){render();if(native){const state=await call('state');if(state.project){cleanState(state);fit();}else{try{const backup=JSON.parse(localStorage.getItem('gacchanko-draft')||'null');if(backup?.graph&&await confirmChoice(i18n.t('前回の未保存の編集を復元しますか？'))){graph=backup.graph;root='';revision='';markDirty();render();fit();}}catch(e){toast(e.message,true);}}}setInterval(poll,2000);}
 window.gacchankoReady=init().catch(e=>toast(e.message,true));
 
 function updateExternalBanner(){
   $('#external-banner').hidden=!pendingExternal;
   const blocked=!!pendingExternal?.violations?.length;
-  $('#external-message').textContent=blocked?'保護対象または不正な設計への変更を検出しました。未採用です。':'外部の設計提案があります。比較して採用してください。';
+  $('#external-message').textContent=blocked?i18n.t('保護対象または不正な設計への変更を検出しました。未採用です。'):i18n.t('外部の設計提案があります。比較して採用してください。');
   $('#reload-project').disabled=!!pendingExternal;
 }
 function applyChangeOverlay(){
@@ -835,10 +850,10 @@ function applyChangeOverlay(){
 async function unlockDesign(kind,item){
   const selection=clone(selected);
   if(root){if(dirty&&!await save(true))return;const state=await call('unlock',{kind,id:item.id,revision});if(!state)return;cleanState(state);selected=selection;render();}
-  else if(await confirmChoice('この要素の保護を解除しますか？')){item.policy='mutable';undoStack=[];redoStack=[];markDirty();render();}
+  else if(await confirmChoice(i18n.t('この要素の保護を解除しますか？'))){item.policy='mutable';undoStack=[];redoStack=[];markDirty();render();}
 }
 function captureTemplateDialog(ids,instantiate=false){
-  modal(`<h2>${instantiate?'原型からvariantを作成':'構成を原型に登録'}</h2>${field('原型名','template-name',graph.nodes.find(n=>n.id===ids[0])?.name||'Prototype')}${field('引き継ぐ構成・役割・許容する差異','template-instructions','',{textarea:true})}<div class="modal-actions"><button>キャンセル</button><button type="button" class="primary" id="save-template">${instantiate?'登録してvariantを作成':'登録'}</button></div>`);
+  modal(i18n.html`<h2>${instantiate?i18n.t('原型からvariantを作成'):i18n.t('構成を原型に登録')}</h2>${field(i18n.t('原型名'),'template-name',graph.nodes.find(n=>n.id===ids[0])?.name||'Prototype')}${field(i18n.t('引き継ぐ構成・役割・許容する差異'),'template-instructions','',{textarea:true})}<div class="modal-actions"><button>キャンセル</button><button type="button" class="primary" id="save-template">${instantiate?i18n.t('登録してvariantを作成'):i18n.t('登録')}</button></div>`);
   $('#save-template').onclick=()=>{
     const name=$('#template-name').value.trim();if(!name)return;
     const template=design.capture(graph,ids,{id:uid('template'),name,instructions:$('#template-instructions').value});
@@ -854,23 +869,23 @@ function instantiateTemplate(template){
 }
 function templateLibrary(){
   const templates=graph.templates||[];
-  modal(`<h2>原型 / variants</h2>${templates.length?templates.map((t,i)=>`<div class="template-card"><strong>${esc(t.name)} · v${t.version}</strong><p>${t.nodes.length} nodes · ${t.edges.length} edges</p><p>${esc(t.instructions)}</p><button type="button" data-instantiate="${i}">この構成からvariantを作成</button></div>`).join(''):'<p>ノードを選択し、インスペクタから構成を原型に登録できます。</p>'}<div class="modal-actions"><button>閉じる</button></div>`);
+  modal(i18n.html`<h2>原型 / variants</h2>${templates.length?templates.map((t,i)=>i18n.html`<div class="template-card"><strong>${esc(t.name)} · v${t.version}</strong><p>${t.nodes.length} nodes · ${t.edges.length} edges</p><p>${esc(t.instructions)}</p><button type="button" data-instantiate="${i}">この構成からvariantを作成</button></div>`).join(''):i18n.t('<p>ノードを選択し、インスペクタから構成を原型に登録できます。</p>')}<div class="modal-actions"><button>閉じる</button></div>`);
   $$('[data-instantiate]').forEach(b=>b.onclick=()=>{$('#modal').close();instantiateTemplate(templates[Number(b.dataset.instantiate)]);});
 }
-const changeNames={added:'追加',modified:'変更',removed:'削除'};
+const changeNames=i18n.messages({added:'追加',modified:'変更',removed:'削除'});
 function changeList(changes){
   const relevant=(c,side)=>c.change==='modified'?Object.fromEntries((c.fields||[]).map(key=>[key,c[side]?.[key]??null])):c[side];
-  return changes.map((c,i)=>`<details class="change-record ${esc(c.change)}"><summary><span>${changeNames[c.change]||esc(c.change)}</span> ${esc(c.name||c.id)} <small>${esc(c.kind)} · ${esc(c.fields?.join(', ')||'')}</small></summary><div class="change-columns"><div><strong>変更前</strong><pre>${esc(JSON.stringify(relevant(c,'before'),null,2))}</pre></div><div><strong>変更後</strong><pre>${esc(JSON.stringify(relevant(c,'after'),null,2))}</pre></div></div></details>`).join('')||'<p class="subtle">設計の差分なし</p>';
+  return changes.map((c,i)=>i18n.html`<details class="change-record ${esc(c.change)}"><summary><span>${changeNames[c.change]||esc(c.change)}</span> ${esc(c.name||c.id)} <small>${esc(c.kind)} · ${esc(c.fields?.join(', ')||'')}</small></summary><div class="change-columns"><div><strong>変更前</strong><pre>${esc(JSON.stringify(relevant(c,'before'),null,2))}</pre></div><div><strong>変更後</strong><pre>${esc(JSON.stringify(relevant(c,'after'),null,2))}</pre></div></div></details>`).join('')||i18n.t('<p class="subtle">設計の差分なし</p>');
 }
 async function showHistory(){
-  if(!root){toast('保存するとGit履歴の記録が始まります。');return;}
-  modal(`<h2>変更履歴</h2>${historyState.protectedFiles?.length?`<p class="protection-warning">保護された実装への外部変更 · 未採用</p><pre>${esc(historyState.protectedFiles.join('\n'))}</pre>`:''}<p class="subtle">緑：追加 · 橙：変更 · 紫：実装変更</p><select id="history-commit">${(historyState.commits||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.id.slice(0,7)+' · '+c.date+' · '+c.actor+' · '+c.message)}</option>`).join('')}</select><div id="history-detail"></div><div class="modal-actions"><button type="button" id="clear-change-overlay">差分の強調を解除</button><button>閉じる</button></div>`);
+  if(!root){toast(i18n.t('保存するとGit履歴の記録が始まります。'));return;}
+  modal(i18n.html`<h2>変更履歴</h2>${historyState.protectedFiles?.length?i18n.html`<p class="protection-warning">保護された実装への外部変更 · 未採用</p><pre>${esc(historyState.protectedFiles.join('\n'))}</pre>`:''}<p class="subtle">緑：追加 · 橙：変更 · 紫：実装変更</p><select id="history-commit">${(historyState.commits||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.id.slice(0,7)+' · '+c.date+' · '+c.actor+' · '+c.message)}</option>`).join('')}</select><div id="history-detail"></div><div class="modal-actions"><button type="button" id="clear-change-overlay">差分の強調を解除</button><button>閉じる</button></div>`);
   $('#modal').classList.add('history-modal');$('#modal').addEventListener('close',()=>$('#modal').classList.remove('history-modal'),{once:true});
   const load=safe(async()=>{
     const id=$('#history-commit')?.value;if(!id)return;
     const detail=await call('historyDetail',{id});if($('#history-commit')?.value!==id)return;
     changeOverlay=detail.changes;overlayFiles=detail.files;applyChangeOverlay();
-    $('#history-detail').innerHTML=changeList(detail.changes)+`<details class="report-checks"><summary>変更ファイル (${detail.files.length}) / Git diff</summary><pre>${esc(detail.files.join('\n'))}</pre><pre>${esc(detail.diff)}</pre></details>`;
+    $('#history-detail').innerHTML=changeList(detail.changes)+i18n.html`<details class="report-checks"><summary>変更ファイル (${detail.files.length}) / Git diff</summary><pre>${esc(detail.files.join('\n'))}</pre><pre>${esc(detail.diff)}</pre></details>`;
   });
   $('#history-commit').onchange=load;$('#clear-change-overlay').onclick=()=>{changeOverlay=[];overlayFiles=[];applyChangeOverlay();$('#modal').close();};await load();
 }
@@ -878,15 +893,15 @@ function reviewExternal(){
   if(!pendingExternal)return;
   changeOverlay=pendingExternal.changes||[];overlayFiles=[];applyChangeOverlay();
   const changes=pendingExternal.changes||[];
-  modal(`<h2>設計提案の比較・採用</h2><p>選択した要素の変更を採用します。選ばなかった変更は元の提案とともに退避します。依存する変更は一緒に選択してください。</p>${dirty?'<p class="protection-warning">未保存の編集があります。JSONで退避するか、提案を退避して先に保存してください。</p>':''}${pendingExternal.violations?.length?`<p class="protection-warning">保護違反: ${esc(pendingExternal.violations.join(', '))}。保護対象を含む選択は採用できません。</p>`:''}${pendingExternal.error?`<p>${esc(pendingExternal.error)}</p>`:''}<div id="proposal-changes">${changes.map(c=>`<label class="proposal-select"><input type="checkbox" data-proposal-key="${esc(c.kind+':'+c.id)}">${esc(c.name||c.id)} · ${esc(c.kind)}</label>${changeList([c])}`).join('')}</div><p id="proposal-error" role="alert"></p><div class="modal-actions"><button type="button" id="proposal-select-all">すべて選択</button><button>閉じる</button><button type="button" class="primary" id="adopt-proposal" ${dirty||pendingExternal.error?'disabled':''}>選択を採用</button></div>`);
+  modal(i18n.html`<h2>設計提案の比較・採用</h2><p>選択した要素の変更を採用します。選ばなかった変更は元の提案とともに退避します。依存する変更は一緒に選択してください。</p>${dirty?i18n.t('<p class="protection-warning">未保存の編集があります。JSONで退避するか、提案を退避して先に保存してください。</p>'):''}${pendingExternal.violations?.length?i18n.html`<p class="protection-warning">保護違反: ${esc(pendingExternal.violations.join(', '))}。保護対象を含む選択は採用できません。</p>`:''}${pendingExternal.error?`<p>${esc(pendingExternal.error)}</p>`:''}<div id="proposal-changes">${changes.map(c=>`<label class="proposal-select"><input type="checkbox" data-proposal-key="${esc(c.kind+':'+c.id)}">${esc(c.name||c.id)} · ${esc(c.kind)}</label>${changeList([c])}`).join('')}</div><p id="proposal-error" role="alert"></p><div class="modal-actions"><button type="button" id="proposal-select-all">すべて選択</button><button>閉じる</button><button type="button" class="primary" id="adopt-proposal" ${dirty||pendingExternal.error?'disabled':''}>選択を採用</button></div>`);
   $('#modal').classList.add('history-modal');$('#modal').addEventListener('close',()=>$('#modal').classList.remove('history-modal'),{once:true});
   $('#proposal-select-all').onclick=()=>$$('[data-proposal-key]').forEach(e=>e.checked=true);
   const reviewedRevision=pendingExternal.diskRevision;
   $('#adopt-proposal').onclick=async()=>{
     const selections=$$('[data-proposal-key]:checked').map(e=>e.dataset.proposalKey);
-    if(!selections.length){$('#proposal-error').textContent='採用する変更を選択してください。';return;}
+    if(!selections.length){$('#proposal-error').textContent=i18n.t('採用する変更を選択してください。');return;}
     const button=$('#adopt-proposal');button.disabled=true;
-    try{const state=await call('adoptExternal',{diskRevision:reviewedRevision,selections});$('#modal').close();cleanState(state);render();toast('選択した設計変更を採用しました。');}
+    try{const state=await call('adoptExternal',{diskRevision:reviewedRevision,selections});$('#modal').close();cleanState(state);render();toast(i18n.t('選択した設計変更を採用しました。'));}
     catch(e){$('#proposal-error').textContent=e.message;button.disabled=false;}
   };
 }
@@ -895,7 +910,7 @@ $('#template-library').onclick=templateLibrary;
 $('#show-history').onclick=safe(showHistory);
 $('#review-external').onclick=reviewExternal;
 $('#reject-external').onclick=safe(async()=>{
-  if(!pendingExternal||!await confirmChoice('外部のgraph.jsonを退避し、最後に採用した設計へ戻します。'))return;
+  if(!pendingExternal||!await confirmChoice(i18n.t('外部のgraph.jsonを退避し、最後に採用した設計へ戻します。')))return;
   const draft=dirty?clone(graph):null;
   const state=await call('rejectExternal',{diskRevision:pendingExternal.diskRevision});cleanState(state);
   if(draft){graph=draft;markDirty();render();}
@@ -911,7 +926,7 @@ document.addEventListener('pointerdown',event=>{if(!event.target.closest('.app-m
 window.addEventListener('keydown',event=>{if(event.key==='Escape')$$('.app-menu').forEach(menu=>menu.open=false);});
 
 function openNodeAppearance(){
-  modal('<h2>ノードの外観</h2><div id="node-appearance-dialog"></div><div class="modal-actions"><button>閉じる</button></div>');
+  modal(i18n.t('<h2>ノードの外観</h2><div id="node-appearance-dialog"></div><div class="modal-actions"><button>閉じる</button></div>'));
   renderNodeAppearanceInspector($('#node-appearance-dialog'));
 }
 function renderNodeAppearanceInspector(container=$('#inspector')){
@@ -919,7 +934,7 @@ function renderNodeAppearanceInspector(container=$('#inspector')){
   const items=graph.nodes.filter(n=>ids.includes(n.id)),first=items[0],value=nodeLook.normalize(first.appearance,first.kind);
   const mixed=key=>items.some(n=>nodeLook.normalize(n.appearance,n.kind)[key]!==value[key]);
   const option=(v,label,current)=>`<option value="${v}" ${v===current?'selected':''}>${label}</option>`;
-  container.insertAdjacentHTML('afterbegin',`<details class="node-appearance-panel" ${container.id==='node-appearance-dialog'||nodeAppearanceExpanded?'open':''}><summary><span class="node-colour-dot" style="background:${value.color}"></span>ノードの外観${items.length>1?` · ${items.length}個`:''}</summary><div class="node-appearance-content"><label class="field"><span>アクセント色${mixed('color')?'（混在）':''}</span><div class="node-colour-inputs"><input type="color" id="node-colour" value="${value.color}" aria-label="ノードのアクセント色"><input id="node-colour-hex" aria-label="アクセント色のHEX値" maxlength="7" value="${value.color}" spellcheck="false"></div></label><div class="node-colour-presets">${nodeLook.presets.map(([name,color])=>`<button type="button" class="node-colour-swatch" data-node-colour="${color}" style="--swatch:${color}" aria-label="${name}" title="${name}"></button>`).join('')}</div><label class="field"><span>カード${mixed('surface')?'（混在）':''}</span><select id="node-surface">${[['filled','ベタ塗り'],['outlined','枠線（Outlined）'],['elevated','影（Elevated）']].map(([v,l])=>option(v,l,value.surface)).join('')}</select></label><label class="field"><span>角の形${mixed('corners')?'（混在）':''}</span><select id="node-corners">${option('uniform','均等',value.corners)}${option('alternating','対角を非対称に',value.corners)}</select></label><label class="field"><span>角の丸み${mixed('radius')?'（混在）':''} <output id="node-radius-value">${value.radius}px</output></span><input id="node-radius" type="range" min="0" max="28" step="1" value="${value.radius}"></label><div class="node-radius-presets">${[0,4,8,12,16,24,28].map(r=>`<button type="button" data-node-radius="${r}">${r}</button>`).join('')}</div><label class="field"><span>タイトルバー${mixed('header')?'（混在）':''}</span><select id="node-header-style">${option('striped','Platinum の縞模様',value.header)}${option('plain','単色',value.header)}</select></label><button type="button" class="wide-button" id="reset-node-appearance">種類ごとの標準に戻す</button></div></details>`);
+  container.insertAdjacentHTML('afterbegin',i18n.html`<details class="node-appearance-panel" ${container.id==='node-appearance-dialog'||nodeAppearanceExpanded?'open':''}><summary><span class="node-colour-dot" style="background:${value.color}"></span>ノードの外観${items.length>1?i18n.html` · ${items.length}個`:''}</summary><div class="node-appearance-content"><label class="field"><span>アクセント色${mixed('color')?i18n.t('（混在）'):''}</span><div class="node-colour-inputs"><input type="color" id="node-colour" value="${value.color}" aria-label="ノードのアクセント色"><input id="node-colour-hex" aria-label="アクセント色のHEX値" maxlength="7" value="${value.color}" spellcheck="false"></div></label><div class="node-colour-presets">${nodeLook.presets.map(([name,color])=>`<button type="button" class="node-colour-swatch" data-node-colour="${color}" style="--swatch:${color}" aria-label="${name}" title="${name}"></button>`).join('')}</div><label class="field"><span>カード${mixed('surface')?i18n.t('（混在）'):''}</span><select id="node-surface">${[['filled',i18n.t('ベタ塗り')],['outlined',i18n.t('枠線（Outlined）')],['elevated',i18n.t('影（Elevated）')]].map(([v,l])=>option(v,l,value.surface)).join('')}</select></label><label class="field"><span>角の形${mixed('corners')?i18n.t('（混在）'):''}</span><select id="node-corners">${option('uniform',i18n.t('均等'),value.corners)}${option('alternating',i18n.t('対角を非対称に'),value.corners)}</select></label><label class="field"><span>角の丸み${mixed('radius')?i18n.t('（混在）'):''} <output id="node-radius-value">${value.radius}px</output></span><input id="node-radius" type="range" min="0" max="28" step="1" value="${value.radius}"></label><div class="node-radius-presets">${[0,4,8,12,16,24,28].map(r=>`<button type="button" data-node-radius="${r}">${r}</button>`).join('')}</div><label class="field"><span>タイトルバー${mixed('header')?i18n.t('（混在）'):''}</span><select id="node-header-style">${option('striped',i18n.t('Platinum の縞模様'),value.header)}${option('plain',i18n.t('単色'),value.header)}</select></label><button type="button" class="wide-button" id="reset-node-appearance">種類ごとの標準に戻す</button></div></details>`);
   $('.node-appearance-panel').ontoggle=event=>{nodeAppearanceExpanded=event.target.open;};
   let checkpoint=false;
   function apply(patch,{reset=false}={}){
@@ -931,7 +946,7 @@ function renderNodeAppearanceInspector(container=$('#inspector')){
   }
   const begin=()=>{checkpoint=false;};
   for(const id of ['node-colour','node-radius']){const input=$('#'+id);input.addEventListener('pointerdown',begin);input.addEventListener('focus',begin);input.onchange=()=>{checkpoint=false;};input.oninput=()=>apply(id==='node-colour'?{color:input.value}:{radius:Number(input.value)});}
-  $('#node-colour-hex').onchange=event=>{const color=event.target.value.trim();if(!/^#[0-9a-f]{6}$/i.test(color)){event.target.value=$('#node-colour').value;toast('色は #RRGGBB で入力してください。',true);return;}begin();apply({color:color.toLowerCase()});};
+  $('#node-colour-hex').onchange=event=>{const color=event.target.value.trim();if(!/^#[0-9a-f]{6}$/i.test(color)){event.target.value=$('#node-colour').value;toast(i18n.t('色は #RRGGBB で入力してください。'),true);return;}begin();apply({color:color.toLowerCase()});};
   for(const [id,key]of [['node-surface','surface'],['node-corners','corners'],['node-header-style','header']])$('#'+id).onchange=event=>{begin();apply({[key]:event.target.value});};
   $$('[data-node-colour]').forEach(button=>button.onclick=()=>{begin();apply({color:button.dataset.nodeColour});});
   $$('[data-node-radius]').forEach(button=>button.onclick=()=>{begin();apply({radius:Number(button.dataset.nodeRadius)});});
@@ -942,12 +957,12 @@ function applyCheckHighlights(){
   const issues=checkedDesign?workflow.check(graph):[];
   $$('.node').forEach(el=>el.classList.toggle('design-incomplete',issues.some(i=>i.kind==='node'&&i.id===el.dataset.node)));
   $$('.edge-group').forEach(el=>el.classList.toggle('design-incomplete',issues.some(i=>i.kind==='edge'&&i.id===el.dataset.edge)));
-  $('#check-design').textContent=checkedDesign?`設計チェック · ${issues.length?issues.length+'件':'OK'}`:'設計チェック ✓';
+  $('#check-design').textContent=checkedDesign?i18n.html`設計チェック · ${issues.length?issues.length+i18n.t('件'):'OK'}`:i18n.t('設計チェック ✓');
 }
 function showDesignCheck(edgeID,forHandoff=false){
   checkedDesign=true;applyCheckHighlights();const issues=workflow.check(graph,edgeID);
   const name=i=>i.kind==='node'?graph.nodes.find(n=>n.id===i.id)?.name:i.kind==='edge'?graph.edges.find(e=>e.id===i.id)?.label:graph.name;
-  modal(`<h2>設計チェック · ${issues.length}件</h2><p>設計の記述を確認します。コードの動作検証ではありません。</p>${issues.map((i,index)=>`<button type="button" class="check-issue" data-check-issue="${index}"><strong>${esc(name(i)||i.id)}</strong><span>${esc(i.message)}</span></button>`).join('')||'<p>記述上の不足は見つかりませんでした。</p>'}<div class="modal-actions"><button>閉じる</button>${forHandoff?'<button type="button" id="handoff-incomplete">未確定のまま相談する</button>':''}</div>`);
+  modal(i18n.html`<h2>設計チェック · ${issues.length}件</h2><p>設計の記述を確認します。コードの動作検証ではありません。</p>${issues.map((i,index)=>`<button type="button" class="check-issue" data-check-issue="${index}"><strong>${esc(name(i)||i.id)}</strong><span>${esc(i.message)}</span></button>`).join('')||i18n.t('<p>記述上の不足は見つかりませんでした。</p>')}<div class="modal-actions"><button>閉じる</button>${forHandoff?i18n.t('<button type="button" id="handoff-incomplete">未確定のまま相談する</button>'):''}</div>`);
   $$('[data-check-issue]').forEach(button=>button.onclick=()=>{
     const i=issues[Number(button.dataset.checkIssue)];$('#modal').close();edgeLayerFilter='all';$('#edge-layer-filter').value='all';
     if(i.kind==='project'){selected=null;render();}else select(i.kind,i.id);
@@ -961,7 +976,7 @@ function renderWorkflowInspector(panel=$('#inspector')){
   const options=(values,current)=>Object.entries(values).map(([v,l])=>`<option value="${v}" ${v===current?'selected':''}>${l}</option>`).join('');
   if(selected?.type!=='edge')return;
   const e=graph.edges.find(e=>e.id===selected.id),ex=e.execution||workflow.execution();
-  panel.insertAdjacentHTML('beforeend',`<section class="execution-settings"><h3>レイヤーと実行順序</h3><label class="field"><span>レイヤー</span><select id="edge-layer">${options(workflow.layers,e.layer||'data')}</select></label><label class="field"><span>起動方式</span><select id="execution-dispatch">${options({sync:'同期 · 完了を待つ',async:'非同期 · キューへ送る'},ex.dispatch)}</select></label><label class="field"><span>完了待ち（同じ実行・反復内）</span><select id="execution-after" multiple size="4">${graph.edges.filter(x=>x.id!==e.id).map(x=>`<option value="${esc(x.id)}" ${ex.after.includes(x.id)?'selected':''}>${esc(x.label)} · ${esc(x.id)}</option>`).join('')}</select><small>⌘ / Ctrl で複数選択・解除。未選択なら入力やイベントから開始。</small></label><label class="field"><span>待機条件</span><select id="execution-join">${options({all:'すべて完了',any:'いずれか完了 · 1回だけ起動'},ex.join)}</select></label>${[['maxConcurrency','最大並列数',1,64],['timeoutMs','期限（ms）',1,3600000],['bufferSize','待機キュー上限',1,10000]].map(([key,label,min,max])=>`<label class="field"><span>${label}</span><input id="execution-${key}" type="number" min="${min}" max="${max}" step="1" value="${ex[key]}"></label>`).join('')}<label class="field"><span>キュー満杯時</span><select id="execution-overflow">${options({block:'送信側を待機',dropOldest:'最も古い待機項目を破棄',dropNewest:'新しい項目を破棄'},ex.overflow)}</select></label><label class="field"><span>失敗・期限切れ</span><select id="execution-onError">${options({stop:'実行を停止',continue:'エラー結果を返して継続'},ex.onError)}</select></label><button type="button" id="confirm-execution" class="wide-button">この実行設定を確定</button><small>生成コードへの仕様です。ここでは実行しません。反復・開始条件・キャンセルは設計指示に記述してください。</small></section>`);
+  panel.insertAdjacentHTML('beforeend',i18n.html`<section class="execution-settings"><h3>レイヤーと実行順序</h3><label class="field"><span>レイヤー</span><select id="edge-layer">${options(workflow.layers,e.layer||'data')}</select></label><label class="field"><span>起動方式</span><select id="execution-dispatch">${options({sync:i18n.t('同期 · 完了を待つ'),async:i18n.t('非同期 · キューへ送る')},ex.dispatch)}</select></label><label class="field"><span>完了待ち（同じ実行・反復内）</span><select id="execution-after" multiple size="4">${graph.edges.filter(x=>x.id!==e.id).map(x=>`<option value="${esc(x.id)}" ${ex.after.includes(x.id)?'selected':''}>${esc(x.label)} · ${esc(x.id)}</option>`).join('')}</select><small>⌘ / Ctrl で複数選択・解除。未選択なら入力やイベントから開始。</small></label><label class="field"><span>待機条件</span><select id="execution-join">${options({all:i18n.t('すべて完了'),any:i18n.t('いずれか完了 · 1回だけ起動')},ex.join)}</select></label>${[['maxConcurrency',i18n.t('最大並列数'),1,64],['timeoutMs',i18n.t('期限（ms）'),1,3600000],['bufferSize',i18n.t('待機キュー上限'),1,10000]].map(([key,label,min,max])=>`<label class="field"><span>${label}</span><input id="execution-${key}" type="number" min="${min}" max="${max}" step="1" value="${ex[key]}"></label>`).join('')}<label class="field"><span>キュー満杯時</span><select id="execution-overflow">${options({block:i18n.t('送信側を待機'),dropOldest:i18n.t('最も古い待機項目を破棄'),dropNewest:i18n.t('新しい項目を破棄')},ex.overflow)}</select></label><label class="field"><span>失敗・期限切れ</span><select id="execution-onError">${options({stop:i18n.t('実行を停止'),continue:i18n.t('エラー結果を返して継続')},ex.onError)}</select></label><button type="button" id="confirm-execution" class="wide-button">この実行設定を確定</button><small>生成コードへの仕様です。ここでは実行しません。反復・開始条件・キャンセルは設計指示に記述してください。</small></section>`);
   $('#edge-layer').onchange=ev=>{mutate(()=>{e.layer=ev.target.value;invalidateEdges(null,e.id);});openEdgeDetails(e);};
   function update(){
     const next={...ex};
@@ -970,7 +985,7 @@ function renderWorkflowInspector(panel=$('#inspector')){
     for(const key of ['maxConcurrency','timeoutMs','bufferSize']){const input=$('#execution-'+key);if(!input.checkValidity()){input.reportValidity();return;}next[key]=Number(input.value);}
     if(next.dispatch==='sync')next.maxConcurrency=1;
     const visited=new Set();function reaches(id){if(id===e.id)return true;if(visited.has(id))return false;visited.add(id);return (graph.edges.find(x=>x.id===id)?.execution?.after||[]).some(reaches);}
-    if(next.after.some(reaches)){toast('完了待ちが循環します。依存先を変更してください。',true);return;}
+    if(next.after.some(reaches)){toast(i18n.t('完了待ちが循環します。依存先を変更してください。'),true);return;}
     mutate(()=>{e.execution=next;invalidateEdges(null,e.id);});openEdgeDetails(e);
   }
   $$('.execution-settings input,.execution-settings select').filter(x=>x.id!=='edge-layer').forEach(input=>input.onchange=update);

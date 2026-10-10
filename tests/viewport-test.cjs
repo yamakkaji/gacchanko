@@ -17,7 +17,7 @@ w.gacchankoPlatform={kind:'test',async request(command,args){
  if(command==='unlock')return null; // A cancelled native unlock must retain protection.
  throw Error(command);
 },on(){return ()=>{};}};
-for(const name of ['bridge.js','appearance.js','node-appearance.js','workflow.js','design.js','app.js'])w.eval(read(name));
+for(const name of [...(baseline?[]:['i18n.js']),'bridge.js','appearance.js','node-appearance.js','workflow.js','design.js','app.js'])w.eval(read(name));
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const frame=()=>new Promise(r=>w.requestAnimationFrame(r));
 (async()=>{try{
@@ -46,7 +46,7 @@ const frame=()=>new Promise(r=>w.requestAnimationFrame(r));
  observer.disconnect();
  if(baseline)return;
  api.select('node','n0');
- assert.deepEqual([...w.document.querySelectorAll('#inspector .field > span')].map(e=>e.textContent),['Component Name','Mutability','Implementation','Component Type','Access','Description']);
+ assert.deepEqual([...w.document.querySelectorAll('#inspector .field > span')].map(e=>e.textContent),['Component Name','Mutability','Implementation','Component Type','Access','Description'].map(w.gacchankoI18n.t));
  assert.equal($('#node-implementation').options.length,2);
  assert.equal($('#node-implementation').value,'existing');
  assert.equal(api.graph.nodes[0].implementationState,'verified','viewing retains legacy verification state');

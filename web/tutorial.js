@@ -1,0 +1,43 @@
+'use strict';
+// A read-only guide. Navigation never mutates the user's graph or undo history.
+window.gacchankoTutorial=(()=>{
+  const content={
+    ja:{title:'gacchanko の使い方',intro:'コンポーネントを置き、つなぐ意図を記述し、エージェントに実装を依頼します。',back:'前へ',next:'次へ',done:'キャンバスに戻る',close:'閉じる',step:'ステップ',tip:'操作のヒント',steps:[
+      {title:'ノードもエッジもコンポーネント',body:'ノードはリポジトリ、モデル、サービスなどの部品を表します。エッジには「何を渡し、どんな処理でつなぐか」という仕様を持たせます。接続そのものも、独立した実装対象です。',action:'左のワークスペースで構成を選び、中央のキャンバスでつなぎ、右のInspectorで意図を記述します。',tip:'このチュートリアルは閲覧専用です。開いているグラフは変更しません。',labels:['ノード：画像入力','エッジ：形式を変換','ノード：モデル']},
+      {title:'ノードを追加する',body:'「＋ コンポーネントを追加」から、ローカルのフォルダ／ファイル、URL／パス、または空のコンポーネントを選べます。フォルダをキャンバスへドラッグ＆ドロップして追加することもできます。',action:'まだ実装がないアイデアは、空のコンポーネントから始めてください。Accessには後からパスやURLを記入できます。',tip:'新しい線を空白で離しても追加画面が開きます。追加したノードには、そのまま接続されます。',labels:['出力からドラッグ','空白で離す','ノードを追加して接続']},
+      {title:'接続する・繋ぎ換える',body:'ノード右側の出力ポートから、別のノード左側の入力ポートへドラッグします。互換性のあるポートの近くで離すと吸着します。入力側から逆向きに始めることもできます。',action:'繋ぎ換えるときは線を選び、端点をドラッグします。空白で離すと、説明や設計指示を保持した未接続エッジとして残ります。',tip:'未接続の丸い端点から再接続できます。Escなら元の接続を維持したままキャンセル。⌘Zで元に戻せます。',labels:['接続元を保持','エッジの仕様も保持','○ 未接続の端点']},
+      {title:'Inspectorに意図を書く',body:'ノードとエッジに共通して、コンポーネント名、変更可否、実装状態、種類、アクセス先、説明を設定します。Description（説明）には、何を実現したいかを書いてください。',action:'immutableは設計の変更を保護します。implementedは実装状態の申告であり、動作検証の結果とは別です。検証結果は実装レポートで確認します。',tip:'詳細ボタンでポートや実行条件を確認できます。見た目を変更するボタンはInspectorの最下部です。',labels:['Component Name','Access','Description']},
+      {title:'保存してエージェントに渡す',body:'最初に「保存」でプロジェクトの保存先を決めます。その後の編集は自動保存されます。対象コンポーネントの「エージェントに渡す」を押すと、依頼文がコピーされます。',action:'依頼文を、ローカルファイルへアクセスできるChatGPT / Codex / Claude Codeに貼り付けます。対象コンポーネントの仕様を読み、実装と検証を依頼してください。',tip:'gacchanko自体がLLMや生成コードを実行するわけではありません。設計チェックで未確定の内容を確認してから依頼できます。',labels:['保存する','依頼文をコピー','エージェントに貼り付け']},
+      {title:'結果を確認して、設計を育てる',body:'エージェントが実装レポートを書き込むと、約2秒ごとの読込で状態や確認記録が更新されます。仕様を変えると、古いレポートは「要更新」になります。',action:'外部から設計の提案が来たら、差分を比較して採用する内容を選びます。「変更履歴」で設計や実装の変更を確認できます。',tip:'この画面は左下の「チュートリアル」やヘルプからいつでも開けます。日本語／Englishは「設定」のLanguage / 言語から切り替えられます。',labels:['実装レポート','設計の差分を確認','次の改善へ']}
+    ]},
+    en:{title:'Getting started with gacchanko',intro:'Place components, describe how they should connect, and hand implementation to an agent.',back:'Back',next:'Next',done:'Return to canvas',close:'Close',step:'Step',tip:'Tip',steps:[
+      {title:'Nodes and edges are components',body:'Nodes represent repositories, models, services and other building blocks. An edge describes what to pass and how to connect them. The connection itself is an independent implementation target.',action:'Choose components in the workspace on the left, connect them on the canvas, and describe your intent in the Inspector on the right.',tip:'This guide is read-only. It does not change your open graph.',labels:['Node: image input','Edge: convert format','Node: model']},
+      {title:'Add a node',body:'Choose “+ Add component” to add a local folder or file, a URL or path, or an empty component. You can also drag a folder onto the canvas.',action:'For an idea with no implementation yet, start with an empty component. Add its path or URL in Access later.',tip:'Dropping a new wire on empty space also opens the add screen. The new node will be connected automatically.',labels:['Drag from output','Release on empty space','Add and connect a node']},
+      {title:'Connect and rewire',body:'Drag from the output port on the right of one node to an input on the left of another. Release near a compatible port to snap to it. You can also start at an input and work backwards.',action:'To rewire, select the edge and drag its endpoint. Drop on empty space to keep it as an unconnected edge, preserving its description and design instructions.',tip:'Drag a loose circular endpoint to reconnect. Esc cancels and keeps the original connection. Use ⌘Z to undo.',labels:['Keep the source','Keep the edge specification','○ Unconnected endpoint']},
+      {title:'Describe intent in the Inspector',body:'Nodes and edges share Component Name, Mutability, Implementation, Component Type, Access and Description. Use Description to explain what you want the component to achieve.',action:'Immutable protects the design from changes. Implemented is a declared implementation state, separate from test results. Review actual checks in the implementation report.',tip:'Use Details for ports and execution settings. Change appearance is at the bottom of the Inspector.',labels:['Component Name','Access','Description']},
+      {title:'Save and hand to an agent',body:'Use Save to choose a project location. Further edits are saved automatically. Select a component and choose Hand to agent to copy its prompt.',action:'Paste the prompt into ChatGPT, Codex or Claude Code with access to your local files. Ask the agent to read the component specification, implement it and verify it.',tip:'gacchanko does not run the LLM or generated code itself. Use Design check to review unresolved details before handing off.',labels:['Save project','Copy the prompt','Paste into your agent']},
+      {title:'Review results and refine the design',body:'When the agent writes an implementation report, checks about every two seconds update its status and verification records. Changing a specification marks old reports as out of date.',action:'Review external design proposals and choose which changes to accept. Use History to inspect changes to the design and implementation.',tip:'Reopen this guide from Tutorial in the lower left or from Help. Switch between 日本語 and English under Language in Settings.',labels:['Implementation report','Review design changes','Refine the design']}
+    ]}
+  };
+  let current=0;
+  function open(index=0){
+    current=Math.max(0,Math.min(5,index));
+    const text=content[i18n.language],step=text.steps[current],escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const dialog=document.querySelector('#modal');
+    document.querySelector('#modal-content').innerHTML=`<section class="tutorial-screen" aria-labelledby="tutorial-title"><div class="tutorial-heading"><div><span class="eyebrow">${text.step} ${current+1} / ${text.steps.length}</span><h2 id="tutorial-title">${text.title}</h2></div><select id="tutorial-language" aria-label="Language / 言語"><option value="ja" ${i18n.language==='ja'?'selected':''}>日本語</option><option value="en" ${i18n.language==='en'?'selected':''}>English</option></select></div><p class="tutorial-intro">${text.intro}</p><nav class="tutorial-steps" aria-label="${text.step}">${text.steps.map((s,i)=>`<button type="button" data-tutorial-step="${i}" ${i===current?'aria-current="step"':''}><span>${i+1}</span>${s.title}</button>`).join('')}</nav><article class="tutorial-content" aria-live="polite"><h3>${step.title}</h3><div class="tutorial-example" aria-label="${step.labels.map(escape).join(' → ')}">${step.labels.map((label,i)=>`${i?'<span class="tutorial-arrow" aria-hidden="true">→</span>':''}<div class="tutorial-example-card">${escape(label)}</div>`).join('')}</div><p>${step.body}</p><p>${step.action}</p><div class="tutorial-tip"><strong>${text.tip}</strong><p>${step.tip}</p></div></article><div class="modal-actions tutorial-actions"><button type="button" id="tutorial-close">${text.close}</button><span></span><button type="button" id="tutorial-back" ${current===0?'disabled':''}>${text.back}</button><button type="button" class="primary" id="tutorial-next">${current===5?text.done:text.next}</button></div></section>`;
+    dialog.classList.add('tutorial-modal');
+    if(!dialog.open)dialog.showModal();
+    for(const button of document.querySelectorAll('[data-tutorial-step]'))button.onclick=()=>open(Number(button.dataset.tutorialStep));
+    document.querySelector('#tutorial-back').onclick=()=>open(current-1);
+    document.querySelector('#tutorial-next').onclick=()=>current===5?dialog.close():open(current+1);
+    document.querySelector('#tutorial-close').onclick=()=>dialog.close();
+    document.querySelector('#tutorial-language').onchange=async event=>{
+      event.target.disabled=true;
+      try{await window.gacchanko.changeLanguage(event.target.value);open(current);document.querySelector('#tutorial-language').focus();}
+      catch(error){event.target.disabled=false;event.target.value=i18n.language;document.querySelector('.tutorial-tip p').textContent=error.message;}
+    };
+    document.querySelector('#tutorial-next').focus();
+  }
+  document.querySelector('#modal').addEventListener('close',()=>document.querySelector('#modal').classList.remove('tutorial-modal'));
+  return Object.freeze({open});
+})();

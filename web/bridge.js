@@ -21,7 +21,7 @@
           const id = 'rpc_' + crypto.randomUUID();
           const timer = setTimeout(() => {
             pending.delete(id);
-            reject(new Error('操作がタイムアウトしました。'));
+            reject(new Error(i18n.t('操作がタイムアウトしました。')));
           }, 300000);
           pending.set(id, {resolve, reject, timer});
           try { handler.postMessage({id, command, args}); }
@@ -30,7 +30,7 @@
       },
       on(event, listener) {
         const names = {drop: 'nativeDrop', error: 'nativeError'};
-        if (!names[event]) throw new Error('未対応のイベント: ' + event);
+        if (!names[event]) throw new Error(i18n.t('未対応のイベント: ') + event);
         const callback = message => listener(message.detail);
         window.addEventListener(names[event], callback);
         return () => window.removeEventListener(names[event], callback);
@@ -45,7 +45,7 @@
     available: !!adapter,
     platform: adapter?.kind || 'browser-preview',
     async request(command, args={}) {
-      if (!adapter) throw new Error('この操作は gacchanko のデスクトップアプリで利用できます。');
+      if (!adapter) throw new Error(i18n.t('この操作は gacchanko のデスクトップアプリで利用できます。'));
       try { return await adapter.request(command, args); }
       catch (error) { throw error instanceof Error ? error : new Error(String(error)); }
     },

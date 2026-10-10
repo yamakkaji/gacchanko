@@ -35,6 +35,12 @@ open dist/gacchanko.app
 
 アプリ実行時の外部ライブラリ、Python、Node.js、npm、uv は不要です。プロジェクトの自動履歴に `/usr/bin/git` を使用します。
 
+## 言語とチュートリアル
+
+「設定 → Language / 言語」で日本語とEnglishを切り替えられます。画面・アプリのメニュー・終了確認・エージェントへの依頼文に反映され、次回起動時も選択を保持します。ノード名、Description、パス、レポートなどのプロジェクト内容やUndo履歴は変更しません。OS標準のファイル選択画面の一部はmacOSの言語設定に従います。
+
+「チュートリアル」は上部メニュー、左下のボタン、空のキャンバス、ヘルプから開けます。ノードとエッジの考え方、追加、接続・未接続エッジ、Inspector、保存とエージェントへの受け渡し、結果の確認を6ステップで案内します。途中のステップへ移動でき、閲覧中にも日英を切り替えられます。チュートリアルの閲覧ではグラフを書き換えません。
+
 ## 最初の使い方
 
 1. Finder からリポジトリやディレクトリを中央のキャンバスへドロップします。「＋ コンポーネントを追加」からフォルダ、URL、空のモジュールも追加できます。
@@ -171,6 +177,8 @@ NODE_PATH="$PWD/.qa/node_modules" node tests/dom-test.cjs
 NODE_PATH="$PWD/.qa/node_modules" node tests/appearance-test.cjs
 NODE_PATH="$PWD/.qa/node_modules" node tests/design-ui-test.cjs
 NODE_PATH="$PWD/.qa/node_modules" node tests/viewport-test.cjs
+NODE_PATH="$PWD/.qa/node_modules" node tests/connection-test.cjs
+NODE_PATH="$PWD/.qa/node_modules" node tests/language-test.cjs
 ```
 
 このテストではネイティブブリッジを模擬して、ポート接続、入力、保存への受け渡し、レポート表示、複数選択、範囲選択、グループ移動・削除、パン、矢印、Undo / Redo などを検証します。表示設定の保存・復元、設定値の検査、折り返し・ループでのグラデーションも検証します。実際の macOS ウィンドウや Finder のドラッグ＆ドロップを検証するものではありません。

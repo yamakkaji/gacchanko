@@ -9,7 +9,7 @@ if CommandLine.arguments.contains("--self-test") {
     do { try runSelfTests(); exit(0) } catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
 }
 if let location = argument("--refresh") {
-    do { let store = ProjectStore(); let state = try store.open(URL(fileURLWithPath: location)); guard state["pendingExternal"] == nil else { throw PatchError("外部の設計変更が保護または形式の検査で拒否されました。GUIで差分を確認してください。") }; try store.exportBrief(); print("Refreshed \(location)"); exit(0) }
+    do { let store = ProjectStore(); let state = try store.open(URL(fileURLWithPath: location)); guard state["pendingExternal"] == nil else { throw PatchError(L("外部の設計変更が保護または形式の検査で拒否されました。GUIで差分を確認してください。")) }; try store.exportBrief(); print("Refreshed \(location)"); exit(0) }
     catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
 }
 
@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         let config = WKWebViewConfiguration()
+        config.userContentController.addUserScript(WKUserScript(source: "window.gacchankoLanguage = '\(Localization.language)';", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController.add(self, name: "gacchanko")
         web = CanvasWebView(frame: .zero, configuration: config)
         web.navigationDelegate = self
@@ -54,16 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         window.contentView = web
         window.delegate = self
         window.center()
-        let menu = NSMenu()
-        let appItem = NSMenuItem(); menu.addItem(appItem)
-        let appMenu = NSMenu(); appItem.submenu = appMenu
-        appMenu.addItem(withTitle: "がっちゃんこ を終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        let editItem = NSMenuItem(); menu.addItem(editItem)
-        let editMenu = NSMenu(title: "Edit"); editItem.submenu = editMenu
-        for (title, selector, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
-            editMenu.addItem(withTitle: title, action: Selector(selector), keyEquivalent: key)
-        }
-        NSApp.mainMenu = menu
+        rebuildMenus()
         if let initial = argument("--project") {
             do { _ = try store.open(URL(fileURLWithPath: initial)) } catch { initialError = error.localizedDescription }
         }
@@ -71,6 +63,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         web.loadFileURL(resources.appendingPathComponent("index.html"), allowingReadAccessTo: resources)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+    func rebuildMenus() {
+        let menu = NSMenu()
+        let appItem = NSMenuItem(); menu.addItem(appItem)
+        let appMenu = NSMenu(); appItem.submenu = appMenu
+        appMenu.addItem(withTitle: L("がっちゃんこ を終了"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let editItem = NSMenuItem(); menu.addItem(editItem)
+        let editMenu = NSMenu(title: L("Edit")); editItem.submenu = editMenu
+        for (title, selector, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
+            editMenu.addItem(withTitle: L(title), action: Selector(selector), keyEquivalent: key)
+        }
+        NSApp.mainMenu = menu
     }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if let initialError { emit("nativeError", value: initialError) }
@@ -92,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     func reply(_ id: String, value: Any? = nil, error: String? = nil) {
         var payload: [String: Any] = ["id": id]
         payload["value"] = value ?? NSNull()
-        if let error { payload["error"] = error }
+        if let error { payload["error"] = L(error) }
         emit("nativeReply", value: payload)
     }
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -100,40 +104,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         let args = body["args"] as? [String: Any] ?? [:]
         do {
             switch command {
+            case "setLanguage":
+                guard let language = args["language"] as? String, ["ja", "en"].contains(language) else { throw PatchError("Unsupported language") }
+                Localization.language = language
+                rebuildMenus()
+                reply(id, value: true)
             case "state": reply(id, value: try store.snapshot())
             case "dirty": dirty = args["value"] as? Bool ?? false; reply(id, value: true)
             case "inspect": reply(id, value: try inspectPath(args["path"] as? String ?? ""))
             case "chooseNodes":
-                let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = true; panel.allowsMultipleSelection = true; panel.prompt = "ノードとして追加"
+                let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = true; panel.allowsMultipleSelection = true; panel.prompt = L("ノードとして追加")
                 reply(id, value: panel.runModal() == .OK ? panel.urls.map(\.path) : [])
             case "newProject":
-                guard let raw = args["graph"] else { throw PatchError("グラフがありません。") }
+                guard let raw = args["graph"] else { throw PatchError(L("グラフがありません。")) }
                 let graph = try JSONDecoder().decode(PatchGraph.self, from: JSONSerialization.data(withJSONObject: raw))
-                let panel = NSSavePanel(); panel.title = "プロジェクトの保存先"; panel.nameFieldStringValue = "\(graph.name).gacchanko"; panel.canCreateDirectories = true
+                let panel = NSSavePanel(); panel.prompt = L("保存"); panel.title = L("プロジェクトの保存先"); panel.nameFieldStringValue = "\(graph.name).gacchanko"; panel.canCreateDirectories = true
                 if panel.runModal() == .OK, let url = panel.url { let result = try store.create(url, graph: graph); dirty = false; reply(id, value: result) } else { reply(id) }
             case "openProject":
-                let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = true; panel.message = "プロジェクトフォルダ、または graph.json を選択"; panel.prompt = "開く"
+                let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = true; panel.message = L("プロジェクトフォルダ、または graph.json を選択"); panel.prompt = L("開く")
                 if panel.runModal() == .OK, let url = panel.url { let result = try store.open(url); dirty = false; reply(id, value: result) } else { reply(id) }
             case "save":
-                guard let raw = args["graph"] else { throw PatchError("グラフがありません。") }
+                guard let raw = args["graph"] else { throw PatchError(L("グラフがありません。")) }
                 let graph = try JSONDecoder().decode(PatchGraph.self, from: JSONSerialization.data(withJSONObject: raw))
                 let result = try store.save(graph, expectedRevision: args["revision"] as? String ?? "")
                 dirty = false; reply(id, value: result)
             case "poll": reply(id, value: try store.poll())
             case "historyDetail":
-                guard let history = store.history else { throw PatchError("先に保存してください。") }
+                guard let history = store.history else { throw PatchError(L("先に保存してください。")) }
                 reply(id, value: try history.detail(args["id"] as? String ?? ""))
             case "unlock":
-                let alert = NSAlert(); alert.messageText = "設計の保護を解除しますか？"; alert.informativeText = "解除は履歴に記録され、この要素を編集できるようになります。"; alert.addButton(withTitle: "解除"); alert.addButton(withTitle: "キャンセル")
+                let alert = NSAlert(); alert.messageText = L("設計の保護を解除しますか？"); alert.informativeText = L("解除は履歴に記録され、この要素を編集できるようになります。"); alert.addButton(withTitle: L("解除")); alert.addButton(withTitle: L("キャンセル"))
                 if alert.runModal() == .alertFirstButtonReturn {
                     reply(id, value: try store.unlock(kind: args["kind"] as? String ?? "", id: args["id"] as? String ?? "", expectedRevision: args["revision"] as? String ?? ""))
                 } else { reply(id) }
             case "adoptExternal":
-                guard !dirty else { throw PatchError("未保存の編集があります。JSONを書き出して退避するか、外部提案を退避して先に保存してください。") }
+                guard !dirty else { throw PatchError(L("未保存の編集があります。JSONを書き出して退避するか、外部提案を退避して先に保存してください。")) }
                 reply(id, value: try store.adoptExternal(diskRevision: args["diskRevision"] as? String ?? "", selections: args["selections"] as? [String] ?? []))
             case "rejectExternal": reply(id, value: try store.rejectExternal(diskRevision: args["diskRevision"] as? String ?? ""))
             case "reload":
-                guard let root = store.root else { throw PatchError("プロジェクトを開いてください。") }
+                guard let root = store.root else { throw PatchError(L("プロジェクトを開いてください。")) }
                 let result = try store.open(root); try store.exportBrief(); dirty = false; reply(id, value: result)
             case "copyPrompt":
                 let text = try store.prompt(edgeID: args["edgeID"] as? String, nodeID: args["nodeID"] as? String)
@@ -142,10 +151,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             case "copy":
                 NSPasteboard.general.clearContents(); NSPasteboard.general.setString(args["text"] as? String ?? "", forType: .string); reply(id, value: true)
             case "reveal":
-                guard let root = store.root else { throw PatchError("先に保存してください。") }
+                guard let root = store.root else { throw PatchError(L("先に保存してください。")) }
                 NSWorkspace.shared.activateFileViewerSelecting([root]); reply(id, value: true)
             case "exportJSON":
-                let panel = NSSavePanel(); panel.nameFieldStringValue = "graph-export.json"
+                let panel = NSSavePanel(); panel.prompt = L("保存"); panel.nameFieldStringValue = "graph-export.json"
                 if panel.runModal() == .OK, let url = panel.url {
                     try JSONSerialization.data(withJSONObject: args["graph"] ?? [:], options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic)
                     reply(id, value: url.path)
@@ -173,7 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     }
     func allowClose() -> Bool {
         guard dirty && !discardApproved else { return true }
-        let alert = NSAlert(); alert.messageText = "まだ保存されていない編集があります"; alert.informativeText = "編集を続けて保存するか、未保存の変更を破棄して閉じてください。"; alert.addButton(withTitle: "編集を続ける"); alert.addButton(withTitle: "破棄して閉じる")
+        let alert = NSAlert(); alert.messageText = L("まだ保存されていない編集があります"); alert.informativeText = L("編集を続けて保存するか、未保存の変更を破棄して閉じてください。"); alert.addButton(withTitle: L("編集を続ける")); alert.addButton(withTitle: L("破棄して閉じる"))
         guard alert.runModal() == .alertSecondButtonReturn else { return false }
         // Closing the last window also requests application termination. Reuse
         // this approval even if a queued web message marks the document dirty.

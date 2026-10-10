@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 APP="$PWD/dist/gacchanko.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/web" "$PWD/.build/module-cache"
-xcrun swiftc -O -module-cache-path "$PWD/.build/module-cache" -framework Cocoa -framework WebKit Sources/Project.swift Sources/SelfTest.swift Sources/main.swift -o "$APP/Contents/MacOS/gacchanko"
+xcrun swiftc -O -module-cache-path "$PWD/.build/module-cache" -framework Cocoa -framework WebKit Sources/Localization.swift Sources/Project.swift Sources/SelfTest.swift Sources/main.swift -o "$APP/Contents/MacOS/gacchanko"
 cp web/* "$APP/Contents/Resources/web/"
 cp tests/ui-smoke.js "$APP/Contents/Resources/ui-smoke.js"
 cat > "$APP/Contents/Info.plist" <<'PLIST'

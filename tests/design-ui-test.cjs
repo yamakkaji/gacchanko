@@ -21,7 +21,7 @@ w.gacchankoPlatform={kind:'test',async request(command,args){
  if(command==='historyDetail')return {id:history.head,changes:[change],files:['graph.json'],diff:'+ Agent design'};
  throw Error(command);
 },on(){return ()=>{};}};
-for(const name of ['bridge.js','appearance.js','node-appearance.js','workflow.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(base,'web',name),'utf8'));
+for(const name of ['i18n.js','bridge.js','appearance.js','node-appearance.js','workflow.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(base,'web',name),'utf8'));
 let count=0;
 const check=(condition,name)=>{assert(condition,name);count++;console.log('PASS '+name);};
 const input=(selector,value)=>{const e=w.document.querySelector(selector);e.value=value;e.dispatchEvent(new w.Event('change',{bubbles:true}));};
@@ -31,7 +31,7 @@ const settle=()=>new Promise(r=>setTimeout(r,10));
  check($('.node[data-node="source"]').dataset.change==='modified','committed external change is marked on canvas');
  $('#check-design').click();check(!$('#modal').textContent.includes('構想／既存実装'),'design check does not demand hidden component details');$('#modal').close();
  check(!$('.node.design-incomplete'),'unspecified legacy components need no extra form fields');
- api.select('node','source');input('#node-implementation','planned');check($('.node[data-node="source"] .node-kind').textContent.includes('not implemented'),'node shows planned implementation status');
+ api.select('node','source');input('#node-implementation','planned');check($('.node[data-node="source"] .node-kind').textContent.includes(w.gacchankoI18n.t('not implemented')),'node shows planned implementation status');
  api.select('edge','wire');$('#edge-details').click();input('#edge-layer','event');input('#execution-dispatch','async');input('#execution-maxConcurrency','3');
  check(api.graph.edges[0].execution.maxConcurrency===3&&api.graph.edges[0].layer==='event','edge stores async concurrency and layer');$('#modal').close();
  input('#edge-layer-filter','data');check(!$('.edge-group')&&!$('.edge-endpoint'),'layer filter hides edges and their reconnection handles');input('#edge-layer-filter','all');

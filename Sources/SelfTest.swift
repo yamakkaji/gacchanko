@@ -1,6 +1,10 @@
 import Foundation
 
 func runSelfTests() throws {
+    let previousDefaults = Localization.defaults
+    let localizationSuite = "gacchanko-localization-tests-\(UUID().uuidString)"
+    Localization.defaults = UserDefaults(suiteName: localizationSuite)!
+    defer { Localization.defaults.removePersistentDomain(forName: localizationSuite); Localization.defaults = previousDefaults }
     var count = 0
     func check(_ condition: Bool, _ name: String) throws { if !condition { throw PatchError(name) }; count += 1; print("PASS \(name)") }
     func rejects(_ name: String, _ body: () throws -> Void) throws {
@@ -21,6 +25,14 @@ func runSelfTests() throws {
     try check(try String(contentsOf: store.root!.appendingPathComponent("AGENT_BRIEF.md"), encoding: .utf8).contains("implement only that edge"), "single-edge handoff scope is explicit")
     let reader = ProjectStore(); _ = try reader.open(store.root!)
     try check(reader.graph?.edges.first?.intent == "Convert JSON", "graph round trip")
+    Localization.language = "en"
+    try check(UserDefaults(suiteName: localizationSuite)?.string(forKey: "gacchanko-language") == "en", "language preference persists independently of project")
+    try check(L("破棄して閉じる") == "Discard and close", "native close confirmation uses selected language")
+    try check(PatchError("パスが見つかりません: /tmp/保存").localizedDescription == "Path not found: /tmp/保存", "native error translates prefix without changing user path")
+    try check(try store.prompt(edgeID: "e1").contains("Implement only edge e1"), "English edge handoff retains exact scope")
+    try check(try store.prompt(edgeID: nil, nodeID: "n1").contains("Implement and verify only this node component"), "English node handoff retains exact scope")
+    Localization.language = "ja"
+    try check(L("破棄して閉じる") == "破棄して閉じる", "native close confirmation switches back to Japanese")
     // Unconnected edges are persisted components, not invalid references.
     let looseStore = ProjectStore()
     var looseGraph = graph

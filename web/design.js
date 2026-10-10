@@ -37,7 +37,7 @@ window.gacchankoDesign = (() => {
     const members=new Set(ids.filter(id=>graph.nodes.some(n=>n.id===id)));
     const clean=item=>{const value=copy(item);value.policy='mutable';delete value.derivedFrom;return value;};
     const nodes=graph.nodes.filter(n=>members.has(n.id)).map(clean);
-    if(!nodes.length)throw Error('原型にするノードを選択してください。');
+    if(!nodes.length)throw Error(i18n.t('原型にするノードを選択してください。'));
     const edges=graph.edges.filter(e=>(members.has(e.source)||members.has(e.target))&&(!e.source||members.has(e.source))&&(!e.target||members.has(e.target))).map(clean);
     for(const e of edges)if(e.execution)e.execution.after=e.execution.after.filter(id=>edges.some(x=>x.id===id));
     return {id,version,name,instructions,nodes,edges};

@@ -29,6 +29,7 @@ w.webkit={messageHandlers:{gacchanko:{postMessage:async({id,command,args})=>{
  queueMicrotask(()=>w.dispatchEvent(new w.CustomEvent('nativeReply',{detail:{id,value}})));
  }catch(error){queueMicrotask(()=>w.dispatchEvent(new w.CustomEvent('nativeReply',{detail:{id,error:error.message}})));}
 }}}};
+w.eval(fs.readFileSync(path.join(base,'web/i18n.js'),'utf8'));
 w.eval(fs.readFileSync(path.join(base,'web/bridge.js'),'utf8'));
 w.eval(fs.readFileSync(path.join(base,'web/appearance.js'),'utf8'));
 w.eval(fs.readFileSync(path.join(base,'web/node-appearance.js'),'utf8'));

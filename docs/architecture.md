@@ -102,3 +102,11 @@ The host snapshot includes `history` (head, commits, per-member changes, changed
 端点の座標は実装fingerprintに含めず、接続・切断は含める。未接続エッジもSPECとMermaidへ出力し、設計チェックとエージェント向け仕様書で未接続であることを明記する。ID・意味内容・実装ファイル・レポートは保持する。原型に含まれる未接続エッジも派生時に保持し、端点の位置をノードと同じ量だけ移動する。
 
 新規の線を空白で離す操作は、追加先の座標・接続方向・レイヤーをノード追加画面に渡す。追加を確定した時だけノードとエッジを一括変更として記録する。追加画面のキャンセル・Esc・キャンバス外へのドロップでは既存の設計を変更しない。
+
+## 言語設定とチュートリアル
+
+`web/i18n.js` はアプリが所有する文字列だけを翻訳する。静的なHTMLはアプリ起動前にテキストと属性を記録し、動的なUIは `i18n.t` と `i18n.html` を使う。タグ付きテンプレートの補間値は翻訳しない。ノード名・説明・パス・エージェントのレポートを翻訳辞書に渡さない。
+
+設定は `gacchanko-language` としてlocalStorageとネイティブのUserDefaultsに保存する。WebKit初期化時に保存済み言語を注入し、`setLanguage({language: 'ja' | 'en'})` でアプリメニューも更新する。言語設定はgraph.jsonやfingerprintに含めない。macOS標準のファイル選択画面の一部はOSの言語に従う。
+
+`web/tutorial.js` は日英の6ステップの閲覧専用画面を提供する。ステップ移動と表示言語の変更は設計・選択・Undo履歴を変更しない。回帰確認は `tests/language-test.cjs`、ネイティブのローカライズと依頼文は `Sources/SelfTest.swift` で行う。

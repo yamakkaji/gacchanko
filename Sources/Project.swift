@@ -94,7 +94,7 @@ struct PatchGraph: Codable {
 }
 struct PatchError: LocalizedError {
     let message: String
-    var errorDescription: String? { message }
+    var errorDescription: String? { L(message) }
     init(_ message: String) { self.message = message }
 }
 let fm = FileManager.default
@@ -456,6 +456,20 @@ final class ProjectStore {
         if let nodeID {
             guard edgeID == nil, let node = graph?.nodes.first(where: { $0.id == nodeID }) else { throw PatchError("対象のノードが見つからないか、対象指定が重複しています。") }
             let directory = root.appendingPathComponent("components/nodes/\(nodeID)")
+            if Localization.language == "en" {
+                return """
+                Implement and verify only this node component.
+                Target: \(node.name) [\(nodeID)]
+                \(root.appendingPathComponent("AGENT_BRIEF.md").path)
+                \(root.appendingPathComponent("graph.json").path)
+                \(directory.appendingPathComponent("SPEC.md").path)
+
+                Adjacent nodes and edges are context only, not implementation targets.
+                Inspect the referenced code and save new implementation in \(directory.appendingPathComponent("implementation").path).
+                Do not modify referenced repositories or remove protection without authorization.
+                Record actual verification results in \(directory.appendingPathComponent("report.json").path), including the SPEC.md fingerprint, status, summary, files and checks.
+                """
+            }
             return """
             次のノードコンポーネントだけを実装・検証してください。
             対象: \(node.name) [\(nodeID)]
@@ -469,6 +483,13 @@ final class ProjectStore {
             実際の検証結果を \(directory.appendingPathComponent("report.json").path) に、SPEC.mdのfingerprint、status、summary、files、checksを含めて記録してください。
             """
         }
+        if Localization.language == "en" {
+            var text = "Read this local project and implement the connections described in its design graph.\n\n\(root.appendingPathComponent("AGENT_BRIEF.md").path)\n\(root.appendingPathComponent("graph.json").path)\n\n"
+            if let id = edgeID, graph?.edges.contains(where: { $0.id == id }) == true {
+                text += "Implement only edge \(id). Its specification is at \(root.appendingPathComponent("connections/\(id)/SPEC.md").path).\n"
+            } else { text += "Use the connections in graph.json as the implementation targets.\n" }
+            return text + "Read the referenced code and instructions. Save generated code under implementations/. Record actual verification results in reports/<edge-id>.json with the SPEC.md fingerprint. If you cannot access these paths, say so."
+        }
         var text = "次のローカルプロジェクトを読んで、設計グラフに沿った接続コードを実装してください。\n\n\(root.appendingPathComponent("AGENT_BRIEF.md").path)\n\(root.appendingPathComponent("graph.json").path)\n\n"
         if let id = edgeID, graph?.edges.contains(where: { $0.id == id }) == true {
             text += "今回の対象は接続 \(id) です。仕様は \(root.appendingPathComponent("connections/\(id)/SPEC.md").path) にあります。\n"
@@ -479,7 +500,7 @@ final class ProjectStore {
 
 func inspectPath(_ raw: String) throws -> [String: Any] {
     if let url = URL(string: raw), ["https", "http", "ssh"].contains(url.scheme ?? "") {
-        return ["path": raw, "name": url.lastPathComponent.replacingOccurrences(of: ".git", with: ""), "kind": "repository", "description": "リモートリポジトリ。まだローカルには取得していません。", "files": []]
+        return ["path": raw, "name": url.lastPathComponent.replacingOccurrences(of: ".git", with: ""), "kind": "repository", "description": L("リモートリポジトリ。まだローカルには取得していません。"), "files": []]
     }
     let expanded = NSString(string: raw).expandingTildeInPath
     let url = URL(fileURLWithPath: expanded).standardizedFileURL

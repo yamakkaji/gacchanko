@@ -2,42 +2,7 @@
 // The canvas depends only on gacchankoHost, never on WebKit or Tauri directly.
 // Another desktop shell may inject gacchankoPlatform before this script loads.
 (() => {
-  function swiftAdapter() {
-    const handler = window.webkit?.messageHandlers?.gacchanko;
-    if (!handler) return null;
-    const pending = new Map();
-    window.addEventListener('nativeReply', event => {
-      const reply = event.detail;
-      const request = pending.get(reply.id);
-      if (!request) return;
-      clearTimeout(request.timer);
-      pending.delete(reply.id);
-      reply.error ? request.reject(new Error(reply.error)) : request.resolve(reply.value);
-    });
-    return {
-      kind: 'swift-webkit',
-      request(command, args) {
-        return new Promise((resolve, reject) => {
-          const id = 'rpc_' + crypto.randomUUID();
-          const timer = setTimeout(() => {
-            pending.delete(id);
-            reject(new Error(i18n.t('操作がタイムアウトしました。')));
-          }, 300000);
-          pending.set(id, {resolve, reject, timer});
-          try { handler.postMessage({id, command, args}); }
-          catch (error) { clearTimeout(timer); pending.delete(id); reject(error); }
-        });
-      },
-      on(event, listener) {
-        const names = {drop: 'nativeDrop', error: 'nativeError'};
-        if (!names[event]) throw new Error(i18n.t('未対応のイベント: ') + event);
-        const callback = message => listener(message.detail);
-        window.addEventListener(names[event], callback);
-        return () => window.removeEventListener(names[event], callback);
-      }
-    };
-  }
-  const adapter = window.gacchankoPlatform || swiftAdapter();
+  const adapter = window.gacchankoPlatform;
   if (adapter && (typeof adapter.request !== 'function' || typeof adapter.on !== 'function')) {
     throw new Error('gacchankoPlatform must implement request() and on().');
   }

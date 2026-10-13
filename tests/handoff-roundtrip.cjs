@@ -1,7 +1,7 @@
-// Real Swift store + actual Python adapter + the app's report polling/DOM.
+// Real Rust store + actual Python adapter + the app's report polling/DOM.
 const {JSDOM}=require('jsdom');
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process'),assert=require('node:assert/strict');
-const repo=path.resolve(__dirname,'..'),project=path.resolve(process.argv[2]),driver=path.join(repo,'.build/store-driver');
+const repo=path.resolve(__dirname,'..'),project=path.resolve(process.argv[2]),driver=path.join(repo,'src-tauri/target/debug/examples/store-driver'+(process.platform==='win32'?'.exe':''));
 const state=()=>JSON.parse(cp.execFileSync(driver,[project,'snapshot'],{encoding:'utf8'}));
 const initial=state(),edge=initial.project.edges[0],file=path.join(project,'reports',edge.id+'.json');
 const report={fingerprint:initial.fingerprints[edge.id],status:'implemented',summary:'観測CLIと行動判断の型をつなぐラッパーを実装。',files:[`implementations/${edge.id}/adapter.py`,`implementations/${edge.id}/test_adapter.py`],checks:[]};
@@ -11,7 +11,7 @@ const dom=new JSDOM(fs.readFileSync(path.join(repo,'web/index.html'),'utf8'),{ur
 const w=dom.window;
 w.HTMLElement.prototype.getBoundingClientRect=function(){return {left:0,top:0,right:900,bottom:700,width:900,height:700};};
 w.gacchankoPlatform={kind:'real-store-test',async request(command){if(['state','poll','reload'].includes(command))return state();if(command==='dirty')return true;throw Error('Unexpected command '+command);},on(){return ()=>{};}};
-for(const name of ['bridge.js','appearance.js','node-appearance.js','workflow.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(repo,'web',name),'utf8'));
+for(const name of ['i18n.js','bridge.js','appearance.js','node-appearance.js','workflow.js','design.js','app.js'])w.eval(fs.readFileSync(path.join(repo,'web',name),'utf8'));
 (async()=>{
  try{
   await w.gacchankoReady;
@@ -26,11 +26,12 @@ for(const name of ['bridge.js','appearance.js','node-appearance.js','workflow.js
   await w.gacchanko.poll();
   assert.equal(w.gacchanko.status(edge.id),'verified');assert(w.document.querySelector('.status-card.verified'));
   console.log('PASS updated report is polled from disk and displayed as verified');
-  assert.equal(w.document.querySelector('#ready-count').textContent,'1 verified');
+  assert.equal(w.document.querySelector('#ready-count').textContent,'1 '+w.gacchankoI18n.t('検証済'));
   const graphFile=path.join(project,'graph.json'),original=fs.readFileSync(graphFile);
   try{
    const changed=JSON.parse(original);changed.edges[0].intent+=' Changed after verification.';fs.writeFileSync(graphFile,JSON.stringify(changed));
-   const stale=state();assert.equal(stale.reports[edge.id].status,'stale');w.gacchanko.cleanState(stale);w.gacchanko.select('edge',edge.id);
+   assert(state().pendingExternal,'external changes await adoption');
+   const stale=JSON.parse(cp.execFileSync(driver,[project,'adopt-edge',edge.id],{encoding:'utf8'}));assert.equal(stale.reports[edge.id].status,'stale');w.gacchanko.cleanState(stale);w.gacchanko.select('edge',edge.id);
    assert(w.document.querySelector('.status-card.stale'));
    console.log('PASS changed requirements invalidate the actual fingerprint and display stale');
   }finally{fs.writeFileSync(graphFile,original);}

@@ -1,0 +1,4025 @@
+[
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "command": "",
+              "description": "context",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 0,
+              "y": 0
+            },
+            "before": null,
+            "change": "added",
+            "fields": [
+              "command",
+              "description",
+              "id",
+              "inputs",
+              "kind",
+              "name",
+              "outputs",
+              "path",
+              "x",
+              "y"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          },
+          {
+            "after": {
+              "command": "",
+              "description": "context",
+              "id": "b",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "b",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 0,
+              "y": 0
+            },
+            "before": null,
+            "change": "added",
+            "fields": [
+              "command",
+              "description",
+              "id",
+              "inputs",
+              "kind",
+              "name",
+              "outputs",
+              "path",
+              "x",
+              "y"
+            ],
+            "id": "b",
+            "kind": "node",
+            "name": "b"
+          },
+          {
+            "after": {
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "before": null,
+            "change": "added",
+            "fields": [
+              "id",
+              "intent",
+              "label",
+              "mode",
+              "source",
+              "sourcePort",
+              "target",
+              "targetPort"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          },
+          {
+            "after": {
+              "description": "画像 / voice",
+              "name": "Parity"
+            },
+            "before": {
+              "description": "",
+              "name": ""
+            },
+            "change": "modified",
+            "fields": [
+              "name",
+              "description"
+            ],
+            "id": "project",
+            "kind": "project",
+            "name": "Parity"
+          }
+        ],
+        "commitCount": 1,
+        "files": [
+          "AGENT_BRIEF.md",
+          "components/nodes/a/SPEC.md",
+          "components/nodes/b/SPEC.md",
+          "connections/e/SPEC.md",
+          "graph.json",
+          "graph.mmd"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {},
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "command": "",
+            "description": "context",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {}
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "command": "",
+              "description": "context",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 0,
+              "y": 0
+            },
+            "before": null,
+            "change": "added",
+            "fields": [
+              "command",
+              "description",
+              "id",
+              "inputs",
+              "kind",
+              "name",
+              "outputs",
+              "path",
+              "x",
+              "y"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          },
+          {
+            "after": {
+              "command": "",
+              "description": "context",
+              "id": "b",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "b",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 0,
+              "y": 0
+            },
+            "before": null,
+            "change": "added",
+            "fields": [
+              "command",
+              "description",
+              "id",
+              "inputs",
+              "kind",
+              "name",
+              "outputs",
+              "path",
+              "x",
+              "y"
+            ],
+            "id": "b",
+            "kind": "node",
+            "name": "b"
+          },
+          {
+            "after": {
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "before": null,
+            "change": "added",
+            "fields": [
+              "id",
+              "intent",
+              "label",
+              "mode",
+              "source",
+              "sourcePort",
+              "target",
+              "targetPort"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          },
+          {
+            "after": {
+              "description": "画像 / voice",
+              "name": "Parity"
+            },
+            "before": {
+              "description": "",
+              "name": ""
+            },
+            "change": "modified",
+            "fields": [
+              "name",
+              "description"
+            ],
+            "id": "project",
+            "kind": "project",
+            "name": "Parity"
+          }
+        ],
+        "commitCount": 1,
+        "files": [
+          "AGENT_BRIEF.md",
+          "components/nodes/a/SPEC.md",
+          "components/nodes/b/SPEC.md",
+          "connections/e/SPEC.md",
+          "graph.json",
+          "graph.mmd"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {},
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "command": "",
+            "description": "context",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {}
+    }
+  },
+  {
+    "ok": true,
+    "value": {}
+  },
+  {
+    "ok": true,
+    "value": {}
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73"
+      },
+      "history": {
+        "changes": [],
+        "commitCount": 2,
+        "files": [
+          "components/nodes/a/report.json",
+          "reports/e.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "verified",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "command": "",
+            "description": "context",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "verified",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "command": "",
+              "description": "context",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "command": "",
+              "description": "context",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 0,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "x"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          }
+        ],
+        "commitCount": 3,
+        "files": [
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "verified",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "command": "",
+            "description": "context",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "verified",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "cb6e2ef6313e65c91a739e9c449cff23b2230401f2f3420d23065e95234e06d7"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "command": "",
+              "description": "context",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 23,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "description"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          }
+        ],
+        "commitCount": 4,
+        "files": [
+          "AGENT_BRIEF.md",
+          "components/nodes/a/SPEC.md",
+          "connections/e/SPEC.md",
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "34cfc2f9694d19f56209f8369293a4bebfd44b20a7d6f88ed00928a403c0af7e",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": false
+  },
+  {
+    "ok": true,
+    "value": {}
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "cb6e2ef6313e65c91a739e9c449cff23b2230401f2f3420d23065e95234e06d7"
+      },
+      "history": {
+        "changes": [],
+        "commitCount": 5,
+        "files": [
+          "implementations/e/main.py"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "34cfc2f9694d19f56209f8369293a4bebfd44b20a7d6f88ed00928a403c0af7e",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "d4d9420ccf8668da26148c0962259385625e962b71a267e8015cd024adf693ac"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 23,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "policy"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          },
+          {
+            "after": {
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "immutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "before": {
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "change": "modified",
+            "fields": [
+              "policy"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          }
+        ],
+        "commitCount": 6,
+        "files": [
+          "AGENT_BRIEF.md",
+          "components/nodes/a/SPEC.md",
+          "connections/e/SPEC.md",
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "d5f41015bcca65999c3b85eee0d96d36378ecafb91fd49df47f271ea854bef64",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "immutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "immutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": false
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "d4d9420ccf8668da26148c0962259385625e962b71a267e8015cd024adf693ac"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "appearance"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          },
+          {
+            "after": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "immutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "before": {
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "immutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "change": "modified",
+            "fields": [
+              "appearance"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          }
+        ],
+        "commitCount": 7,
+        "files": [
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "d5f41015bcca65999c3b85eee0d96d36378ecafb91fd49df47f271ea854bef64",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "immutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "immutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": false
+  },
+  {
+    "ok": true,
+    "value": {}
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "d4d9420ccf8668da26148c0962259385625e962b71a267e8015cd024adf693ac"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "appearance"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          },
+          {
+            "after": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "immutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "before": {
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "immutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "change": "modified",
+            "fields": [
+              "appearance"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          }
+        ],
+        "commitCount": 7,
+        "files": [
+          "graph.json"
+        ],
+        "protectedFiles": [
+          "implementations/e/main.py"
+        ]
+      },
+      "nodeFingerprints": {
+        "a": "d5f41015bcca65999c3b85eee0d96d36378ecafb91fd49df47f271ea854bef64",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "immutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "immutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "blocked",
+          "summary": "保護された実装への外部変更を検出しました。履歴への採用を停止しています。"
+        }
+      }
+    }
+  },
+  {
+    "ok": false
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "4a7a3ca3710af459c746dc3f7c2b379566d5ac9a2a23db3f01eb5c15c277a9c7"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "mutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "before": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "immutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "change": "modified",
+            "fields": [
+              "policy"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          }
+        ],
+        "commitCount": 8,
+        "files": [
+          "connections/e/SPEC.md",
+          "graph.json",
+          "implementations/e/main.py"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "d5f41015bcca65999c3b85eee0d96d36378ecafb91fd49df47f271ea854bef64",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "mutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "immutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {}
+  },
+  {
+    "ok": true,
+    "value": {
+      "changes": [
+        {
+          "after": {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "unsafe",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "immutable",
+            "x": 23,
+            "y": 0
+          },
+          "before": {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "immutable",
+            "x": 23,
+            "y": 0
+          },
+          "change": "modified",
+          "fields": [
+            "description"
+          ],
+          "id": "a",
+          "kind": "node",
+          "name": "a"
+        },
+        {
+          "after": {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          },
+          "before": {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          },
+          "change": "modified",
+          "fields": [
+            "description"
+          ],
+          "id": "b",
+          "kind": "node",
+          "name": "b"
+        }
+      ],
+      "externalChange": true,
+      "violations": [
+        "node:a"
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "4a7a3ca3710af459c746dc3f7c2b379566d5ac9a2a23db3f01eb5c15c277a9c7"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "mutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "before": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "immutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "change": "modified",
+            "fields": [
+              "policy"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          }
+        ],
+        "commitCount": 8,
+        "files": [
+          "connections/e/SPEC.md",
+          "graph.json",
+          "implementations/e/main.py"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "d5f41015bcca65999c3b85eee0d96d36378ecafb91fd49df47f271ea854bef64",
+        "b": "eecb4b6bf69fb095255521bc8cdce5779b67f790d6b1b5ce2fb566320c41163a"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "pendingExternal": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "unsafe",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "description"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          },
+          {
+            "after": {
+              "command": "",
+              "description": "safe",
+              "id": "b",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "b",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 0,
+              "y": 0
+            },
+            "before": {
+              "command": "",
+              "description": "context",
+              "id": "b",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "b",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 0,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "description"
+            ],
+            "id": "b",
+            "kind": "node",
+            "name": "b"
+          }
+        ],
+        "externalChange": true,
+        "violations": [
+          "node:a"
+        ]
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "mutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "immutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "context",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": false
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "d8949c27177f996f5257ca2f387cca3dd7a20a2080b0b9a2691afbaf9b058568"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "command": "",
+              "description": "safe",
+              "id": "b",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "b",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 0,
+              "y": 0
+            },
+            "before": {
+              "command": "",
+              "description": "context",
+              "id": "b",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "b",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "x": 0,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "description"
+            ],
+            "id": "b",
+            "kind": "node",
+            "name": "b"
+          }
+        ],
+        "commitCount": 9,
+        "files": [
+          "AGENT_BRIEF.md",
+          "components/nodes/b/SPEC.md",
+          "connections/e/SPEC.md",
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "d5f41015bcca65999c3b85eee0d96d36378ecafb91fd49df47f271ea854bef64",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "mutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "immutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "06964f76b64d7a4e5515945c4c1e9fdcd162882129ac2795a3dcdc59073b7b35"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "mutable",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "policy"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          }
+        ],
+        "commitCount": 10,
+        "files": [
+          "AGENT_BRIEF.md",
+          "components/nodes/a/SPEC.md",
+          "connections/e/SPEC.md",
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "32e381e72ac46e48c1379444a0955985b923c3dd4d46af419b8394c90fc6d03f",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "mutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {}
+  },
+  {
+    "ok": false
+  },
+  {
+    "ok": false
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "06964f76b64d7a4e5515945c4c1e9fdcd162882129ac2795a3dcdc59073b7b35"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "mutable",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "policy"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          }
+        ],
+        "commitCount": 10,
+        "files": [
+          "AGENT_BRIEF.md",
+          "components/nodes/a/SPEC.md",
+          "connections/e/SPEC.md",
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "32e381e72ac46e48c1379444a0955985b923c3dd4d46af419b8394c90fc6d03f",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "mutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {}
+  },
+  {
+    "ok": true,
+    "value": {
+      "externalChange": true,
+      "violations": [
+        "invalid graph"
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "06964f76b64d7a4e5515945c4c1e9fdcd162882129ac2795a3dcdc59073b7b35"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "mutable",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "policy"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          }
+        ],
+        "commitCount": 10,
+        "files": [
+          "AGENT_BRIEF.md",
+          "components/nodes/a/SPEC.md",
+          "connections/e/SPEC.md",
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "32e381e72ac46e48c1379444a0955985b923c3dd4d46af419b8394c90fc6d03f",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "pendingExternal": {
+        "externalChange": true,
+        "violations": [
+          "invalid graph"
+        ]
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "mutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "06964f76b64d7a4e5515945c4c1e9fdcd162882129ac2795a3dcdc59073b7b35"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "mutable",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "immutable",
+              "x": 23,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "policy"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          }
+        ],
+        "commitCount": 10,
+        "files": [
+          "AGENT_BRIEF.md",
+          "components/nodes/a/SPEC.md",
+          "connections/e/SPEC.md",
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "32e381e72ac46e48c1379444a0955985b923c3dd4d46af419b8394c90fc6d03f",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "mutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "b",
+            "targetPort": "in"
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "ededb5eb8a0f6161f5a5a4faf85fe17c5dc0f833745813e3f004432f747854bb"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "mutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "",
+              "targetPort": "",
+              "targetPosition": {
+                "x": 300,
+                "y": 150
+              }
+            },
+            "before": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "mutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "change": "modified",
+            "fields": [
+              "target",
+              "targetPort",
+              "targetPosition"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          }
+        ],
+        "commitCount": 11,
+        "files": [
+          "AGENT_BRIEF.md",
+          "connections/e/SPEC.md",
+          "graph.json",
+          "graph.mmd"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "32e381e72ac46e48c1379444a0955985b923c3dd4d46af419b8394c90fc6d03f",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "mutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "",
+            "targetPort": "",
+            "targetPosition": {
+              "x": 300,
+              "y": 150
+            }
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "ededb5eb8a0f6161f5a5a4faf85fe17c5dc0f833745813e3f004432f747854bb"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "mutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "",
+              "targetPort": "",
+              "targetPosition": {
+                "x": 300,
+                "y": 150
+              }
+            },
+            "before": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "mutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "b",
+              "targetPort": "in"
+            },
+            "change": "modified",
+            "fields": [
+              "target",
+              "targetPort",
+              "targetPosition"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          }
+        ],
+        "commitCount": 11,
+        "files": [
+          "AGENT_BRIEF.md",
+          "connections/e/SPEC.md",
+          "graph.json",
+          "graph.mmd"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "32e381e72ac46e48c1379444a0955985b923c3dd4d46af419b8394c90fc6d03f",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "mutable",
+            "source": "a",
+            "sourcePort": "out",
+            "target": "",
+            "targetPort": "",
+            "targetPosition": {
+              "x": 300,
+              "y": 150
+            }
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "text": "external edit"
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {
+        "e": "b0fe09c63942730e65704282dc8731ada1fbf25623de35e771342cd07fd5e788"
+      },
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "mutable",
+              "source": "",
+              "sourcePort": "",
+              "sourcePosition": {
+                "x": 20,
+                "y": 50
+              },
+              "target": "",
+              "targetPort": "",
+              "targetPosition": {
+                "x": 300,
+                "y": 150
+              }
+            },
+            "before": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "mutable",
+              "source": "a",
+              "sourcePort": "out",
+              "target": "",
+              "targetPort": "",
+              "targetPosition": {
+                "x": 300,
+                "y": 150
+              }
+            },
+            "change": "modified",
+            "fields": [
+              "source",
+              "sourcePort",
+              "sourcePosition"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          }
+        ],
+        "commitCount": 12,
+        "files": [
+          "AGENT_BRIEF.md",
+          "connections/e/SPEC.md",
+          "graph.json",
+          "graph.mmd"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "32e381e72ac46e48c1379444a0955985b923c3dd4d46af419b8394c90fc6d03f",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [
+          {
+            "appearance": {
+              "arrows": true,
+              "pattern": "chevrons",
+              "patternColour": "#294f4a",
+              "size": 6,
+              "source": "#102030",
+              "spacing": 50,
+              "style": "both",
+              "target": "#abcdef",
+              "width": 5
+            },
+            "id": "e",
+            "intent": "Convert JSON",
+            "label": "Bridge",
+            "mode": "request",
+            "policy": "mutable",
+            "source": "",
+            "sourcePort": "",
+            "sourcePosition": {
+              "x": 20,
+              "y": 50
+            },
+            "target": "",
+            "targetPort": "",
+            "targetPosition": {
+              "x": 300,
+              "y": 150
+            }
+          }
+        ],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {
+        "e": {
+          "fingerprint": "d73d12c15c4510484559b462d7c663f6ef349e20528fffb9de660d0b16858a73",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      }
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {},
+      "history": {
+        "changes": [
+          {
+            "after": null,
+            "before": {
+              "appearance": {
+                "arrows": true,
+                "pattern": "chevrons",
+                "patternColour": "#294f4a",
+                "size": 6,
+                "source": "#102030",
+                "spacing": 50,
+                "style": "both",
+                "target": "#abcdef",
+                "width": 5
+              },
+              "id": "e",
+              "intent": "Convert JSON",
+              "label": "Bridge",
+              "mode": "request",
+              "policy": "mutable",
+              "source": "",
+              "sourcePort": "",
+              "sourcePosition": {
+                "x": 20,
+                "y": 50
+              },
+              "target": "",
+              "targetPort": "",
+              "targetPosition": {
+                "x": 300,
+                "y": 150
+              }
+            },
+            "change": "removed",
+            "fields": [
+              "appearance",
+              "id",
+              "intent",
+              "label",
+              "mode",
+              "policy",
+              "source",
+              "sourcePort",
+              "sourcePosition",
+              "target",
+              "targetPort",
+              "targetPosition"
+            ],
+            "id": "e",
+            "kind": "edge",
+            "name": "Bridge"
+          }
+        ],
+        "commitCount": 13,
+        "files": [
+          "AGENT_BRIEF.md",
+          "graph.json",
+          "graph.mmd"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "32e381e72ac46e48c1379444a0955985b923c3dd4d46af419b8394c90fc6d03f",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "description": "Changed input",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "reports": {}
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "text": "external edit"
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {},
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "derivedFrom": {
+                "memberID": "p",
+                "templateID": "prototype",
+                "version": 1
+              },
+              "description": "Changed input",
+              "designInstructions": "Variant",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "mutable",
+              "x": 23,
+              "y": 0
+            },
+            "before": {
+              "appearance": {
+                "color": "#715669",
+                "corners": "alternating",
+                "header": "plain",
+                "radius": 24,
+                "surface": "filled"
+              },
+              "command": "",
+              "description": "Changed input",
+              "id": "a",
+              "inputs": [
+                "in"
+              ],
+              "kind": "directory",
+              "name": "a",
+              "outputs": [
+                "out"
+              ],
+              "path": "",
+              "policy": "mutable",
+              "x": 23,
+              "y": 0
+            },
+            "change": "modified",
+            "fields": [
+              "derivedFrom",
+              "designInstructions"
+            ],
+            "id": "a",
+            "kind": "node",
+            "name": "a"
+          },
+          {
+            "after": {
+              "edges": [],
+              "id": "prototype",
+              "instructions": "Keep both component roles and specialize behaviour.",
+              "name": "Prototype",
+              "nodes": [
+                {
+                  "command": "",
+                  "description": "context",
+                  "id": "p",
+                  "inputs": [
+                    "in"
+                  ],
+                  "kind": "directory",
+                  "name": "p",
+                  "outputs": [
+                    "out"
+                  ],
+                  "path": "",
+                  "x": 0,
+                  "y": 0
+                }
+              ],
+              "version": 1
+            },
+            "before": null,
+            "change": "added",
+            "fields": [
+              "edges",
+              "id",
+              "instructions",
+              "name",
+              "nodes",
+              "version"
+            ],
+            "id": "prototype:1",
+            "kind": "template",
+            "name": "Prototype"
+          }
+        ],
+        "commitCount": 14,
+        "files": [
+          "AGENT_BRIEF.md",
+          "components/nodes/a/SPEC.md",
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "b32709cd04d367aec1f258a5d2e1f479da43b8af0b02ab52bf6144409ce75658",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "derivedFrom": {
+              "memberID": "p",
+              "templateID": "prototype",
+              "version": 1
+            },
+            "description": "Changed input",
+            "designInstructions": "Variant",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1,
+        "templates": [
+          {
+            "edges": [],
+            "id": "prototype",
+            "instructions": "Keep both component roles and specialize behaviour.",
+            "name": "Prototype",
+            "nodes": [
+              {
+                "command": "",
+                "description": "context",
+                "id": "p",
+                "inputs": [
+                  "in"
+                ],
+                "kind": "directory",
+                "name": "p",
+                "outputs": [
+                  "out"
+                ],
+                "path": "",
+                "x": 0,
+                "y": 0
+              }
+            ],
+            "version": 1
+          }
+        ]
+      },
+      "reports": {}
+    }
+  },
+  {
+    "ok": false
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {},
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "edges": [],
+              "id": "prototype",
+              "instructions": "Keep both component roles and specialize behaviour.",
+              "name": "Prototype",
+              "nodes": [
+                {
+                  "command": "",
+                  "description": "context",
+                  "id": "p",
+                  "inputs": [
+                    "in"
+                  ],
+                  "kind": "directory",
+                  "name": "p",
+                  "outputs": [
+                    "out"
+                  ],
+                  "path": "",
+                  "x": 0,
+                  "y": 0
+                }
+              ],
+              "version": 2
+            },
+            "before": null,
+            "change": "added",
+            "fields": [
+              "edges",
+              "id",
+              "instructions",
+              "name",
+              "nodes",
+              "version"
+            ],
+            "id": "prototype:2",
+            "kind": "template",
+            "name": "Prototype"
+          }
+        ],
+        "commitCount": 15,
+        "files": [
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "b32709cd04d367aec1f258a5d2e1f479da43b8af0b02ab52bf6144409ce75658",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "derivedFrom": {
+              "memberID": "p",
+              "templateID": "prototype",
+              "version": 1
+            },
+            "description": "Changed input",
+            "designInstructions": "Variant",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1,
+        "templates": [
+          {
+            "edges": [],
+            "id": "prototype",
+            "instructions": "Keep both component roles and specialize behaviour.",
+            "name": "Prototype",
+            "nodes": [
+              {
+                "command": "",
+                "description": "context",
+                "id": "p",
+                "inputs": [
+                  "in"
+                ],
+                "kind": "directory",
+                "name": "p",
+                "outputs": [
+                  "out"
+                ],
+                "path": "",
+                "x": 0,
+                "y": 0
+              }
+            ],
+            "version": 1
+          },
+          {
+            "edges": [],
+            "id": "prototype",
+            "instructions": "Keep both component roles and specialize behaviour.",
+            "name": "Prototype",
+            "nodes": [
+              {
+                "command": "",
+                "description": "context",
+                "id": "p",
+                "inputs": [
+                  "in"
+                ],
+                "kind": "directory",
+                "name": "p",
+                "outputs": [
+                  "out"
+                ],
+                "path": "",
+                "x": 0,
+                "y": 0
+              }
+            ],
+            "version": 2
+          }
+        ]
+      },
+      "reports": {}
+    }
+  },
+  {
+    "ok": true,
+    "value": {
+      "fingerprints": {},
+      "history": {
+        "changes": [
+          {
+            "after": {
+              "edges": [],
+              "id": "prototype",
+              "instructions": "Keep both component roles and specialize behaviour.",
+              "name": "Prototype",
+              "nodes": [
+                {
+                  "command": "",
+                  "description": "context",
+                  "id": "p",
+                  "inputs": [
+                    "in"
+                  ],
+                  "kind": "directory",
+                  "name": "p",
+                  "outputs": [
+                    "out"
+                  ],
+                  "path": "",
+                  "x": 0,
+                  "y": 0
+                }
+              ],
+              "version": 2
+            },
+            "before": null,
+            "change": "added",
+            "fields": [
+              "edges",
+              "id",
+              "instructions",
+              "name",
+              "nodes",
+              "version"
+            ],
+            "id": "prototype:2",
+            "kind": "template",
+            "name": "Prototype"
+          }
+        ],
+        "commitCount": 15,
+        "files": [
+          "graph.json"
+        ],
+        "protectedFiles": []
+      },
+      "nodeFingerprints": {
+        "a": "b32709cd04d367aec1f258a5d2e1f479da43b8af0b02ab52bf6144409ce75658",
+        "b": "3ddd23168810116b67d91588d5fee231e85900af3ef77cf28834f8e88cbb5c59"
+      },
+      "nodeReports": {
+        "a": {
+          "fingerprint": "a8c89639e4e17cf3a5e484df3202aa40c7a29b33958d0c42f5a7efbd801b61f5",
+          "status": "stale",
+          "summary": "Test fixture"
+        }
+      },
+      "project": {
+        "description": "画像 / voice",
+        "edges": [],
+        "name": "Parity",
+        "nodes": [
+          {
+            "appearance": {
+              "color": "#715669",
+              "corners": "alternating",
+              "header": "plain",
+              "radius": 24,
+              "surface": "filled"
+            },
+            "command": "",
+            "derivedFrom": {
+              "memberID": "p",
+              "templateID": "prototype",
+              "version": 1
+            },
+            "description": "Changed input",
+            "designInstructions": "Variant",
+            "id": "a",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "a",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "policy": "mutable",
+            "x": 23,
+            "y": 0
+          },
+          {
+            "command": "",
+            "description": "safe",
+            "id": "b",
+            "inputs": [
+              "in"
+            ],
+            "kind": "directory",
+            "name": "b",
+            "outputs": [
+              "out"
+            ],
+            "path": "",
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "schemaVersion": 1,
+        "templates": [
+          {
+            "edges": [],
+            "id": "prototype",
+            "instructions": "Keep both component roles and specialize behaviour.",
+            "name": "Prototype",
+            "nodes": [
+              {
+                "command": "",
+                "description": "context",
+                "id": "p",
+                "inputs": [
+                  "in"
+                ],
+                "kind": "directory",
+                "name": "p",
+                "outputs": [
+                  "out"
+                ],
+                "path": "",
+                "x": 0,
+                "y": 0
+              }
+            ],
+            "version": 1
+          },
+          {
+            "edges": [],
+            "id": "prototype",
+            "instructions": "Keep both component roles and specialize behaviour.",
+            "name": "Prototype",
+            "nodes": [
+              {
+                "command": "",
+                "description": "context",
+                "id": "p",
+                "inputs": [
+                  "in"
+                ],
+                "kind": "directory",
+                "name": "p",
+                "outputs": [
+                  "out"
+                ],
+                "path": "",
+                "x": 0,
+                "y": 0
+              }
+            ],
+            "version": 2
+          }
+        ]
+      },
+      "reports": {}
+    }
+  }
+]

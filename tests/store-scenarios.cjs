@@ -1,5 +1,5 @@
-// Differential tests exercise the actual Swift and Rust stores with identical
-// actions, including agent file writes. Only host paths/hashes of formatted
+// Regression scenarios exercise the Rust store against the accepted migration
+// baseline, including agent file writes. Only host paths/hashes of formatted
 // graph files and nondeterministic commit IDs/dates are excluded.
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process'),assert=require('node:assert/strict');
 const base=path.resolve(__dirname,'..'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'gacchanko-parity-'));
@@ -29,7 +29,9 @@ function normalized(v){if(Array.isArray(v))return v.map(normalized);if(!v||typeo
 try {
  const file=path.join(tmp,'scenario.json');fs.writeFileSync(file,JSON.stringify(ops));
  const run=(bin,name)=>JSON.parse(cp.execFileSync(bin,[file,path.join(tmp,name)],{encoding:'utf8',maxBuffer:8e6}));
- const swift=run(path.join(base,'.build/parity-driver'),'swift');const rust=run(path.join(base,'src-tauri/target/debug/examples/parity-driver'),'rust');
- for(let i=0;i<ops.length;i++){const expected=!ops[i].name.includes('rejected')&&ops[i].name!=='save blocked by protected code';assert.equal(swift[i].ok,expected,'Swift baseline: '+ops[i].name);assert.deepEqual(normalized(rust[i]),normalized(swift[i]),ops[i].name);console.log('PASS parity: '+ops[i].name);}
- console.log(`${ops.length} Swift/Rust scenario steps match`);
+ const expected=JSON.parse(fs.readFileSync(path.join(base,'tests/fixtures/store-scenarios.json'),'utf8'));
+ const rust=run(path.join(base,'src-tauri/target/debug/examples/parity-driver'+(process.platform==='win32'?'.exe':'')),'rust');
+ assert.equal(rust.length,ops.length);assert.equal(expected.length,ops.length);
+ for(let i=0;i<ops.length;i++){assert.deepEqual(normalized(rust[i]),expected[i],ops[i].name);console.log('PASS scenario: '+ops[i].name);}
+ console.log(`${ops.length} store scenario steps match the accepted baseline`);
 }finally{fs.rmSync(tmp,{recursive:true,force:true});}

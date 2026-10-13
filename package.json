@@ -8,7 +8,8 @@
     "tauri": "tauri",
     "test:store": "cargo test --manifest-path src-tauri/Cargo.toml --no-default-features",
     "test:ui": "node tests/run-ui.cjs",
-    "test:native": "node tests/run-native.cjs"
+    "test:native": "node tests/run-native.cjs",
+    "test:integration": "cargo build --manifest-path src-tauri/Cargo.toml --no-default-features --examples && node tests/store-scenarios.cjs && node tests/tauri-compat.cjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",

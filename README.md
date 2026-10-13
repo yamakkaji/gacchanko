@@ -82,7 +82,7 @@ npm run build
 
 更新時はアプリを終了して `git pull --ff-only`、`npm ci`、`npm run build` を実行します。
 
-従来のSwift版は `Sources/` と `build.sh` に残しています。Macで `./build.sh` を実行すると `dist/gacchanko.app` が生成されます。既存の `.gacchanko` プロジェクト形式はTauri版と共通ですが、外観・言語などアプリ側の設定は保存領域が異なるため再設定してください。同じプロジェクトを両方のアプリで同時に編集することは避けてください。
+旧Swift版で作成した `.gacchanko` プロジェクトも開けます。旧版の外観・言語設定は自動移行されないため再設定してください。
 
 作成する `.gacchanko` プロジェクトは、このリポジトリの外へ保存すると、アプリのソースと分けて管理できます。
 
@@ -267,6 +267,7 @@ npm run build
 ```sh
 npm ci
 npm run test:store
+npm run test:integration
 npm run test:ui
 npm run dev
 ```
@@ -279,16 +280,7 @@ Rustの保存処理のテストでは、保存・仕様書・レポート・履�
 npm run test:native
 ```
 
-Swift版との比較結果・既知の差分は[互換性とテスト範囲](docs/tauri-parity.md)に記載しています。ネイティブのファイル選択、ドラッグ＆ドロップ、終了確認、Windowsの表示倍率とパスの扱いは実機で確認してください。テストで生成した `verified` レポートはテスト用fixtureであり、エージェント実装の検証結果ではありません。
-
-Swift版とのfingerprint・履歴互換テストはmacOSで実行できます。
-
-```sh
-mkdir -p .build/module-cache
-xcrun swiftc -module-cache-path .build/module-cache Sources/Localization.swift Sources/Project.swift tests/store-driver/main.swift -o .build/store-driver
-cargo build --manifest-path src-tauri/Cargo.toml --no-default-features --example store-driver
-node tests/tauri-compat.cjs
-```
+検証済みの範囲と実機確認項目は[テスト範囲](docs/testing.md)に記載しています。`npm run test:integration` は42操作の保存・保護・提案シナリオと旧版のfingerprint互換性を、Rustだけで検証します。ネイティブのファイル選択、Finderからのドロップ、終了確認、Windowsの表示倍率とパスの扱いは実機で確認してください。テスト用の `verified` レポートはエージェント実装の検証結果ではありません。
 
 GitHub ActionsはMac（Apple Silicon / Intel）とWindows x64をビルドします。`v*` タグをpushすると、成功したインストーラーを下書きのGitHub Releaseへ添付します。公開前に実機確認とリリース内容の確認を行ってください。現時点ではApple Developer ID署名・公証、Windowsコード署名は設定していません。配布時の注意は[リリース案内](docs/tauri-release.md)を参照してください。
 
@@ -301,6 +293,5 @@ GitHub ActionsはMac（Apple Silicon / Intel）とWindows x64をビルドしま�
 - `web/`：共通のグラフ編集画面。`tauri.js` がTauriを検出し、`bridge.js` の共通インターフェースへ接続します。
 - `src-tauri/src/main.rs`：ファイル選択、クリップボード、ドロップ、メニュー、終了確認。
 - `src-tauri/src/store.rs`、`graph.rs`、`history.rs`：保存、仕様書、検証、fingerprint、libgit2によるプロジェクト内の履歴。
-- `Sources/`：比較・互換確認用に保持している従来のSwift版。
 
 通信コマンドと各部分の役割は[設計文書](docs/architecture.md)を参照してください。

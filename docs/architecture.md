@@ -1,17 +1,17 @@
 # デスクトップ環境から独立した設計
 
-がっちゃんこ gacchanko はローカルで動くスタンドアロンのデスクトップアプリとして開発する。現行のクロスプラットフォーム版はTauri 2 / Rust。従来のSwift / AppKit / WKWebView版も互換確認用に保持している。画面とエージェントとのファイル連携形式は共通。
+がっちゃんこ gacchanko はTauri 2 / Rustで動くスタンドアロンのデスクトップアプリです。画面はHTML / CSS / JavaScriptで構成します。
 
 ## 責任の分担
 
-| 部分 | Swift版 | Tauri版 |
-|---|---|---|
-| ノード・エッジ編集、選択、パン、ズーム、Undo、インスペクター | `web/app.js`、HTML、CSS | 画面側は継続利用 |
-| エッジの表示設定・描画 | `web/appearance.js`、WebView の localStorage | 共通描画を継続利用。保存領域の移行時は設定キーも移行 |
-| ホストとの通信 | `web/bridge.js` 内の Swift アダプター | `web/tauri.js` の同一インターフェース |
-| ウィンドウ、ファイルダイアログ、クリップボード、ドロップ、終了確認 | `Sources/main.swift` | `src-tauri/src/main.rs` |
-| グラフ検証、保存、競合検知、仕様書生成、レポートの読み込み | `Sources/Project.swift` | `src-tauri/src/store.rs`、`graph.rs`、`history.rs` |
-| エージェントとの受け渡し | `graph.json`、`AGENT_BRIEF.md`、接続仕様、実装、レポート | 同じファイル形式を使用 |
+| 部分 | 実装 |
+|---|---|
+| ノード・エッジ編集、選択、パン、ズーム、Undo、インスペクター | `web/app.js`、HTML、CSS |
+| エッジの表示設定・描画 | `web/appearance.js`、WebViewのlocalStorage |
+| ホストとの通信 | `web/tauri.js`、`web/bridge.js` |
+| ウィンドウ、ファイル選択、クリップボード、ドロップ、終了確認 | `src-tauri/src/main.rs` |
+| グラフ検証、保存、競合検知、仕様書生成、レポート | `src-tauri/src/store.rs`、`graph.rs`、`history.rs` |
+| エージェントとの受け渡し | `graph.json`、`AGENT_BRIEF.md`、接続仕様、実装、レポート |
 
 画面は `window.gacchankoHost` のみを使用する。WebKit、AppKit、Tauri、ファイルシステムを画面から直接呼び出さない。今後のネイティブ機能もこの境界へ追加する。
 
@@ -26,7 +26,7 @@ interface GacchankoPlatform {
 }
 ```
 
-異なるデスクトップ環境は `bridge.js` より先に `window.gacchankoPlatform` を設定する。`bridge.js` はエラーを Error に正規化し、画面向けに `available`、`platform`、`request`、`on` を公開する。注入がなければ現行の Swift アダプターを使う。ネイティブ環境がなければ、ファイル操作を行えないブラウザプレビューとなる。
+異なるデスクトップ環境は `bridge.js` より先に `window.gacchankoPlatform` を設定する。`bridge.js` はエラーを Error に正規化し、画面向けに `available`、`platform`、`request`、`on` を公開する。ネイティブ環境がなければ、ファイル操作を行えないブラウザプレビューとなる。
 
 主なコマンドは以下の通り。入出力は JSON に変換できる値に限る。
 
@@ -53,7 +53,7 @@ ProjectSnapshot は `{project,root,revision,reports,fingerprints,nodeReports,nod
 
 ## Tauri 2 用アダプター
 
-`web/tauri.js` が実際のTauri実行環境を検出し、次のアダプターを登録する。ブラウザプレビューとSwift版では何もしない。
+`web/tauri.js` が実際のTauri実行環境を検出し、次のアダプターを登録する。ブラウザプレビューでは何もしない。
 
 ```js
 // bridge.js より先に読み込む。
@@ -79,9 +79,9 @@ Tauri の公式リファレンス
 - https://v2.tauri.app/ja/develop/calling-rust/
 - https://v2.tauri.app/develop/calling-frontend/
 
-Tauri版は独立したRustの保存処理とlibgit2を使い、Swift実行ファイルや外部Gitに依存しない。ネイティブダイアログはイベントスレッドを塞がないスレッドで開く。終了とウィンドウ閉鎖の両方で未保存確認を行う。CSPで外部スクリプトを拒否し、ナビゲーションをアプリのローカルoriginへ制限する。フロントエンドには汎用ファイル書き込み・シェル実行の権限を与えない。
+Tauri版は独立したRustの保存処理とlibgit2を使い、外部Gitに依存しない。ネイティブダイアログはイベントスレッドを塞がないスレッドで開く。終了とウィンドウ閉鎖の両方で未保存確認を行う。CSPで外部スクリプトを拒否し、ナビゲーションをアプリのローカルoriginへ制限する。フロントエンドには汎用ファイル書き込み・シェル実行の権限を与えない。
 
-保存するグラフ形式は維持し、Rust での fingerprint と revision の算出方法も既存の Swift 実装に合わせる。既存レポートの互換性を保証するため、`tests/tauri-compat.cjs` で両ホストを実行して比較する。JSON の数値や文字列の正規化が言語間で異なる場合は、明示的な形式更新と移行処理を用意する。
+保存するグラフ形式はschemaVersion 1を維持する。旧版から採取したfingerprintと42操作の結果を `tests/fixtures/` に保持し、`npm run test:integration` でRustの保存処理と照合する。形式を変更する場合は明示的な移行処理を用意する。
 
 
 ## Versioned design bridge
@@ -93,7 +93,7 @@ The host snapshot includes `history` (head, commits, per-member changes, changed
 - `rejectExternal {diskRevision}` archives the candidate JSON and restores the last accepted graph, with optimistic concurrency validation.
 - `poll` returns pending changes and protection violations instead of accepting them. A valid external edit is adopted by `reload` only when the frontend has no local draft.
 
-`web/design.js` contains pure graph diff, protection, subgraph capture and variant operations. Both Swift and Rust stores independently enforce policy at the persistence boundary; disabling a frontend control alone is insufficient.
+`web/design.js` contains pure graph diff, protection, subgraph capture and variant operations. The Rust store enforces policy at the persistence boundary; disabling a frontend control alone is insufficient.
 
 ## 未接続のエッジ
 
@@ -107,9 +107,9 @@ The host snapshot includes `history` (head, commits, per-member changes, changed
 
 `web/i18n.js` はアプリが所有する文字列だけを翻訳する。静的なHTMLはアプリ起動前にテキストと属性を記録し、動的なUIは `i18n.t` と `i18n.html` を使う。タグ付きテンプレートの補間値は翻訳しない。ノード名・説明・パス・エージェントのレポートを翻訳辞書に渡さない。
 
-設定は `gacchanko-language` としてlocalStorageへ保存する。Swift版ではネイティブのUserDefaultsにも保存する。Tauri版は起動時にlocalStorageの値をネイティブメニューへ同期する。WebKit初期化時に保存済み言語を注入し、`setLanguage({language: 'ja' | 'en'})` でアプリメニューも更新する。言語設定はgraph.jsonやfingerprintに含めない。macOS標準のファイル選択画面の一部はOSの言語に従う。
+設定は `gacchanko-language` としてlocalStorageへ保存する。Tauri版は起動時にlocalStorageの値をネイティブメニューへ同期する。`setLanguage({language: 'ja' | 'en'})` でアプリメニューも更新する。言語設定はgraph.jsonやfingerprintに含めない。macOS標準のファイル選択画面の一部はOSの言語に従う。
 
-`web/tutorial.js` は日英の6ステップの閲覧専用画面を提供する。ステップ移動と表示言語の変更は設計・選択・Undo履歴を変更しない。回帰確認は `tests/language-test.cjs`、ネイティブのローカライズと依頼文は `Sources/SelfTest.swift` で行う。
+`web/tutorial.js` は日英の6ステップの閲覧専用画面を提供する。ステップ移動と表示言語の変更は設計・選択・Undo履歴を変更しない。回帰確認は `tests/language-test.cjs`、ネイティブのローカライズと依頼文は `tests/ui-smoke.js` とRustの保存処理テスト で行う。
 
 ## ビルドと配布
 

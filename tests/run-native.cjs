@@ -1,4 +1,4 @@
-// Run the shared Swift/Tauri GUI scenarios against a real Tauri WebView and
+// Run the GUI scenarios against a real Tauri WebView and
 // Rust store. All projects are temporary and the WebView is incognito.
 const {spawn,spawnSync}=require('node:child_process');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');

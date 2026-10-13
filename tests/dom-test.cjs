@@ -18,8 +18,8 @@ const hash=g=>crypto.createHash('sha256').update(JSON.stringify(g)).digest('hex'
 const fingerprint=(edge,g)=>hash({edge,nodes:g.nodes.filter(n=>[edge.source,edge.target].includes(n.id)).map(({x,y,...rest})=>rest),description:g.description});
 const state=()=>JSON.parse(JSON.stringify({project:graph,root:dir+'.gacchanko',revision,reports:graph?Object.fromEntries(graph.edges.filter(e=>reports[e.id]).map(e=>[e.id,{...reports[e.id],status:reports[e.id].fingerprint===fingerprint(e,graph)?reports[e.id].status:'stale'}])):{}}));
 let finish;const result=new Promise(r=>finish=r);
-w.webkit={messageHandlers:{gacchanko:{postMessage:async({id,command,args})=>{
- try{let value;
+w.gacchankoPlatform={kind:"test",on(){return ()=>{};},request:async(command,args)=>{
+ let value;
  switch(command){
  case 'state':value={project:null};break;
  case 'dirty':value=true;break;
@@ -33,9 +33,8 @@ w.webkit={messageHandlers:{gacchanko:{postMessage:async({id,command,args})=>{
  case 'testFinish':finish(args);return;
  default:throw Error('Unexpected command '+command);
  }
- queueMicrotask(()=>w.dispatchEvent(new w.CustomEvent('nativeReply',{detail:{id,value}})));
- }catch(error){queueMicrotask(()=>w.dispatchEvent(new w.CustomEvent('nativeReply',{detail:{id,error:error.message}})));}
-}}}};
+ return value;
+}};
 w.eval(fs.readFileSync(path.join(base,'web/i18n.js'),'utf8'));
 w.eval(fs.readFileSync(path.join(base,'web/bridge.js'),'utf8'));
 w.eval(fs.readFileSync(path.join(base,'web/appearance.js'),'utf8'));

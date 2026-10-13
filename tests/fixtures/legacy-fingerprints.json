@@ -1,0 +1,39 @@
+{
+  "Multimodal-agent": {
+    "fingerprints": {
+      "edge_01": "2c12113f9077893ccf5c10cbab731ae7b099e982cc865d8deec6d8c9198d35bc",
+      "edge_02": "33277a5c6248d1f1bf33ec55ebc355296c45f6a301372a8c469362e53cbb0653",
+      "edge_03": "fda20691e681772167deb3fa0c4d6f8c77f0ee1a5307f523738ae23744e64572",
+      "edge_04": "988c1ef20224035e7ffd967d2362a8ba4c40d64257de0add471cacf3768b3fa9",
+      "edge_05": "a0a0fd8ce8dc781463af81ba9a3c112e615a5280378c28da3e18db066e918636",
+      "edge_06": "2bcc679d4b947b0e4a71025c7bca0fe0fc170d4c61c474f07ab96608a78c19e6",
+      "edge_07": "7637364ed3289751c9735712607c19b705bf203e8dca293a477e185b39c77e51"
+    },
+    "nodeFingerprints": {
+      "agent": "18908ae20a5a4650845ddcfc2ec34dd67fa7517b0013d2f40aed45038d5813ad",
+      "audio": "1e0f5eb683b69501bb27c28d978411b261f6e32bcf1a0ad7a63b75aafefd0acf",
+      "image": "fb272b02acfef7183a20ca07266b782c672db60fef9cf52766a2925822b56dda",
+      "response": "e399d4e5c432e502a5cef4e777647cd83c06ae89e8f143a3b7f80fd1c72edf44",
+      "text": "0e88fe60565a2deeb946a89ba5befe0583eeb3c2c31c56201142569825bf4710",
+      "tools": "03f124776eebe5a2c0fe634c485b73d00735d9ae83cf0f565c90d21ba64bc268",
+      "transcribe": "44442aac88eac9492209e7d7f66569be458e586730387e52eacdb9e540f1099e",
+      "vision": "9ca0026c3554bf615f91d58f62c076fff0a8f41d007f018004df65257b5cdf63"
+    }
+  },
+  "Template-variants": {
+    "fingerprints": {
+      "prototype_action": "096c7d6eb89483df6d888565b93b9ae22162179a41c0e891211af65a4be0cc78",
+      "prototype_observation": "c07cd97df678a786ad8a972a0cb91acf76c899f84ff0fdbee4263acafdaaa86b",
+      "variant_action": "e16de815aa5de60ac0a4a90ecb97053ae544f1b65d11866dd0671b8b8577b1cf",
+      "variant_observation": "a90f00eac8c957a50f8abeaa8ff9d64c6d3171ba040d60d3a1f7ccd77692a4ea"
+    },
+    "nodeFingerprints": {
+      "prototype_act": "a20a6450c57c1297f6e8373c210ed004392ca34d88ab83886c07dd537bf27a7e",
+      "prototype_capture": "636dd599364fedea7039b4e7cef4188ca2d35cba9a63e81bf14e4369d694c106",
+      "prototype_decide": "c97cf5892c7154fa9d43d2212ba12ac50d53850a0ebe81de66a3679d87c8acd1",
+      "variant_act": "9ccd15c9463b9e23eabf1d177b991e1d5f9edc0e071676c25a081fe28637f09d",
+      "variant_capture": "e03e643ae4777fb91af68c3986eb9fd96b7455c38ac658aeca8413cb286ffef1",
+      "variant_decide": "71337fddd7502cbb31a2d3f3ae552a3797edd24de31e3f98d3fbd7b095896190"
+    }
+  }
+}

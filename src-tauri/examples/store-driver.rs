@@ -31,6 +31,11 @@ fn run() -> gacchanko_core::Result<()> {
             "{}",
             store.prompt(args.get(3).map(String::as_str), None, "ja")?
         ),
+        "adopt-edge" => {
+            let id = args.get(3).ok_or("Edge ID required")?;
+            let revision = hash(&std::fs::read(path.join("graph.json"))?);
+            println!("{}", store.adopt(&revision, &[format!("edge:{id}")])?);
+        }
         "poll" => println!("{}", store.poll()?),
         "snapshot" => println!("{state}"),
         _ => return Err("Unknown command".into()),

@@ -10,7 +10,9 @@
 リポジトリのルートで実行します。macOS、Python 3.10 以降、ビルド済みのアプリが必要です。
 
 ```sh
-./build.sh
+npm ci
+npm run build
+cargo build --manifest-path src-tauri/Cargo.toml --no-default-features --example store-driver
 python3 examples/agent-handoff/prepare.py .build/handoff-demo.gacchanko
 ```
 
@@ -50,12 +52,11 @@ python3 examples/agent-handoff/verify.py .build/handoff-demo.gacchanko
 - 「この接続だけ」の依頼と全体指示書の対象範囲が紛らわしかったため、単一エッジを指定されたらその接続だけを実装する文言に修正しました。
 - 長いテストログで生成物の保存先が埋もれたため、確認記録を折りたたみ表示にしました。
 - GUI はコードを実行するランナーではありません。テスト実行とレポート作成は依頼されたエージェントが行います。
-- レポートをディスクから読み直して「実装済→検証済」を表示できました。仕様を変更すると実際の Swift fingerprint が一致しなくなり「要更新」になります。
-- ネイティブアプリの画面操作は承認されなかったため、画面のドラッグ操作はブラウザプレビューで、報告反映は実際の Swift 保存処理と画面の DOM を組み合わせて確認しました。
+- レポートをディスクから読み直して「実装済→検証済」を表示できました。仕様を変更すると実際の保存処理の fingerprint が一致しなくなり「要更新」になります。
 
 開発者用の再検証（jsdom はアプリ本体には不要）:
 
 ```sh
-xcrun swiftc -module-cache-path .build/module-cache Sources/Project.swift tests/store-driver/main.swift -o .build/store-driver
-NODE_PATH="$PWD/.qa/node_modules" node tests/handoff-roundtrip.cjs .build/handoff-demo.gacchanko
+cargo build --manifest-path src-tauri/Cargo.toml --no-default-features --example store-driver
+node tests/handoff-roundtrip.cjs .build/handoff-demo.gacchanko
 ```

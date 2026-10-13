@@ -272,3 +272,27 @@ fn brief_preserves_node_template_context_and_invalid_report_status() {
     .unwrap();
     assert_eq!(s.snapshot().unwrap()["reports"]["e"]["status"], "stale");
 }
+
+#[test]
+fn inspection_distinguishes_files_from_directories_and_repositories() {
+    use crate::store::inspect;
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    fs::write(root.join("README.md"), "Parent project description").unwrap();
+    let file = root.join("video.MOV");
+    fs::write(&file, b"fixture").unwrap();
+    assert_eq!(inspect(root.to_str().unwrap()).unwrap()["kind"], "directory");
+    fs::create_dir(root.join(".git")).unwrap();
+    assert_eq!(inspect(root.to_str().unwrap()).unwrap()["kind"], "repository");
+    let result = inspect(file.to_str().unwrap()).unwrap();
+    assert_eq!(result["kind"], "file");
+    assert_eq!(result["description"], "");
+    assert_eq!(result["files"], json!([]));
+    assert!(inspect(root.join("missing").to_str().unwrap()).is_err());
+    let (_d, mut store) = fixture();
+    let mut g = graph();
+    g.nodes[0].kind = "file".into();
+    let revision = store.snapshot().unwrap()["revision"].as_str().unwrap().to_owned();
+    store.save(g, &revision, &[], true).unwrap();
+    assert_eq!(store.snapshot().unwrap()["project"]["nodes"][0]["kind"], "file");
+}

@@ -274,6 +274,7 @@ window.gacchankoI18n=(()=>{
   "EDGE": "エッジ",
   "repository": "リポジトリ",
   "directory": "ディレクトリ",
+  "file": "ファイル",
   "model": "モデル",
   "service": "サービス",
   "application": "アプリケーション",
@@ -287,7 +288,7 @@ window.gacchankoI18n=(()=>{
   try{language=window.gacchankoLanguage||localStorage.getItem(key)||'ja';}catch{}
   if(!['ja','en'].includes(language))language='ja';
   const patterns={};
-  for(const [name,table] of Object.entries({ja:{...Object.fromEntries(Object.entries(ja).filter(([key])=>!['repository','directory','model','service','application','note','data','request / response','event','mutable','immutable','implemented','not implemented'].includes(key)))},en}))patterns[name]=new RegExp(Object.keys(table).sort((a,b)=>b.length-a.length).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'g');
+  for(const [name,table] of Object.entries({ja:{...Object.fromEntries(Object.entries(ja).filter(([key])=>!['repository','directory','file','model','service','application','note','data','request / response','event','mutable','immutable','implemented','not implemented'].includes(key)))},en}))patterns[name]=new RegExp(Object.keys(table).sort((a,b)=>b.length-a.length).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'g');
   const fragment=text=>String(text).replace(patterns[language],match=>(language==='en'?en:ja)[match]);
   const t=text=>Object.hasOwn(language==='en'?en:ja,text)?(language==='en'?en:ja)[text]:fragment(text);
   const html=(parts,...values)=>parts.reduce((result,part,index)=>result+fragment(part)+(index<values.length?String(values[index]):''),'');

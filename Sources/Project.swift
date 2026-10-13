@@ -506,7 +506,12 @@ func inspectPath(_ raw: String) throws -> [String: Any] {
     let url = URL(fileURLWithPath: expanded).standardizedFileURL
     var isDirectory: ObjCBool = false
     guard fm.fileExists(atPath: url.path, isDirectory: &isDirectory) else { throw PatchError("パスが見つかりません: \(url.path)") }
-    let directory = isDirectory.boolValue ? url : url.deletingLastPathComponent()
+    if !isDirectory.boolValue {
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey])
+        guard values.isRegularFile == true else { throw PatchError("通常のファイルまたはディレクトリを指定してください。") }
+        return ["path": url.path, "name": url.lastPathComponent, "kind": "file", "description": "", "files": []]
+    }
+    let directory = url
     let names = try fm.contentsOfDirectory(atPath: directory.path).filter { !$0.hasPrefix(".") }.sorted()
     var description = ""
     if let readme = names.first(where: { $0.lowercased() == "readme.md" || $0.lowercased() == "readme.txt" }) {

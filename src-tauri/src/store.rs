@@ -606,11 +606,14 @@ pub fn inspect(raw: &str) -> Result<Value> {
         PathBuf::from(raw)
     };
     let path = dunce::canonicalize(path)?;
-    let dir = if path.is_dir() {
-        path.as_path()
-    } else {
-        path.parent().unwrap()
-    };
+    let metadata = fs::metadata(&path)?;
+    if metadata.is_file() {
+        return Ok(json!({"path":path,"name":path.file_name().unwrap_or_default().to_string_lossy(),"kind":"file","description":"","files":[]}));
+    }
+    if !metadata.is_dir() {
+        return Err("Only regular files and directories are supported".into());
+    }
+    let dir = path.as_path();
     let mut names = fs::read_dir(dir)?
         .map(|e| e.map(|e| e.file_name().to_string_lossy().into_owned()))
         .collect::<std::io::Result<Vec<_>>>()?;

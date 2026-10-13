@@ -21,7 +21,7 @@ let graph=emptyGraph(), root='', revision='', reports={}, fingerprints={}, nodeR
 let spacePressed=false;
 let view={x:65,y:65,zoom:1}, connecting=null, drag=null, undoStack=[], redoStack=[], editSerial=0;
 let saveTimer, toastTimer, saveTask=null, external=false, inspectorKey='', draftBackupError=false;
-const symbols={repository:'⌘',directory:'▧',model:'✧',service:'⇄',application:'▣',note:'◇'};
+const symbols={repository:'⌘',directory:'▧',file:'▤',model:'✧',service:'⇄',application:'▣',note:'◇'};
 const statusNames=i18n.messages({pending:'未実装',implemented:'実装済',verified:'検証済',blocked:'確認が必要',stale:'要更新'});
 function toast(message,error=false) {
   $('#toast').textContent=message; $('#toast').classList.toggle('error',error); $('#toast').hidden=false;

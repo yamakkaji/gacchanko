@@ -23,6 +23,23 @@ struct Session {
     approved: AtomicBool,
     language: Mutex<String>,
 }
+// WebviewWindow drag/drop is routed as WindowEvent by the Tauri runtime.
+fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, position }) = event {
+        let scale = window.scale_factor().unwrap_or(1.0);
+        let _ = window.emit(
+            "gacchanko://drop",
+            json!({"paths":paths,"x":position.x/scale,"y":position.y/scale}),
+        );
+    }
+    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        let s = window.state::<Session>();
+        if s.dirty.load(Ordering::SeqCst) && !s.approved.load(Ordering::SeqCst) {
+            api.prevent_close();
+            confirm_exit(window.app_handle());
+        }
+    }
+}
 fn arg<'a>(a: &'a Value, key: &str) -> &'a str {
     a[key].as_str().unwrap_or("")
 }
@@ -107,6 +124,18 @@ fn rpc(app: &tauri::AppHandle, command: &str, args: &Value) -> Result<Value> {
     #[cfg(debug_assertions)]
     if let Some(output) = test_output() {
         match command {
+            "testDrop" => {
+                let webview = app.get_webview_window("main").ok_or("Missing test window")?;
+                let window = webview.as_ref().window();
+                let scale = window.scale_factor()?;
+                let paths = vec![std::path::PathBuf::from(arg(args, "path"))];
+                let position = tauri::PhysicalPosition::new(
+                    args["x"].as_f64().ok_or("Missing x")? * scale,
+                    args["y"].as_f64().ok_or("Missing y")? * scale,
+                );
+                handle_window_event(&window, &tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop {paths, position}));
+                return Ok(json!(true));
+            }
             "testCreate" => {
                 let project = output
                     .parent()
@@ -371,26 +400,7 @@ fn main() {
             builder.build()?;
             Ok(())
         })
-        .on_webview_event(|web, event| {
-            if let tauri::WebviewEvent::DragDrop(tauri::DragDropEvent::Drop { paths, position }) =
-                event
-            {
-                let scale = web.window().scale_factor().unwrap_or(1.0);
-                let _ = web.emit(
-                    "gacchanko://drop",
-                    json!({"paths":paths,"x":position.x/scale,"y":position.y/scale}),
-                );
-            }
-        })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                let s = window.state::<Session>();
-                if s.dirty.load(Ordering::SeqCst) && !s.approved.load(Ordering::SeqCst) {
-                    api.prevent_close();
-                    confirm_exit(window.app_handle());
-                }
-            }
-        })
+        .on_window_event(handle_window_event)
         .build(tauri::generate_context!())
         .expect("Unable to start gacchanko")
         .run(|app, event| {

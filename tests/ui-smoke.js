@@ -217,6 +217,14 @@
     await P.changeLanguage('ja');
     const state=await P.call('state');const detail=await P.call('historyDetail',{id:state.history.head});
     check(typeof detail.diff==='string'&&detail.diff.length>0,'Tauri native Git history diff');
+    const dropRect=canvas.getBoundingClientRect(),dropX=dropRect.left+dropRect.width/2,dropY=dropRect.top+dropRect.height/2;
+    const dropCount=P.graph.nodes.length;
+    await P.call('testDrop',{path:P.root,x:dropX,y:dropY});
+    const dropDeadline=Date.now()+3000;
+    while(P.graph.nodes.length===dropCount&&Date.now()<dropDeadline)await new Promise(resolve=>setTimeout(resolve,20));
+    check(P.graph.nodes.length===dropCount+1&&P.graph.nodes.at(-1).path===P.root,'Tauri window drop event adds a local node');
+    const dropped=screen(P.graph.nodes.at(-1).x,P.graph.nodes.at(-1).y);
+    check(Math.abs(dropped.x-dropX)<1&&Math.abs(dropped.y-dropY)<1,'Tauri drop converts physical coordinates to the zoomed canvas');
   }
   await P.call('testFinish',{ok:true,checks,project:P.root});
  }catch(error){window.gacchankoAppearance.save(originalAppearance);await P.call('testFinish',{ok:false,checks,error:[String(error),error.stack].filter(Boolean).join('\n')});}

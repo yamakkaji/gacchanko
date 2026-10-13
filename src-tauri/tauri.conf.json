@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "gacchanko",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "identifier": "io.github.yamakkaji.gacchanko",
   "build": {
     "frontendDist": "../web"
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "がっちゃんこ gacchanko",
+        "title": "\u304c\u3063\u3061\u3083\u3093\u3053 gacchanko",
         "width": 1440,
         "height": 900,
         "minWidth": 1050,

@@ -1,5 +1,5 @@
 use crate::{graph::*, model::PatchGraph, Result};
-use git2::{Oid, Repository, Signature};
+use git2::{Oid, Repository, RepositoryInitOptions, Signature};
 use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
@@ -8,6 +8,58 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+pub const MAX_CHECKPOINT_BYTES: u64 = 100_000_000;
+const MAX_WALK_ENTRIES: usize = 10_000;
+const MAX_WALK_DEPTH: usize = 32;
+
+fn regular_metadata(path: &Path) -> Result<fs::Metadata> {
+    let m = fs::symlink_metadata(path)?;
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        if m.file_attributes() & 0x400 != 0 {
+            return Err("Reparse points are not allowed in project files".into());
+        }
+    }
+    if !m.is_file() && !m.is_dir() {
+        return Err("Only regular files and directories are allowed in projects".into());
+    }
+    Ok(m)
+}
+
+// Check before opening (FIFOs can block on open), then check the opened handle.
+// Same-user concurrent replacement of parent directories is outside this guard.
+pub(crate) fn open_regular(path: &Path) -> Result<fs::File> {
+    if !regular_metadata(path)?.is_file() {
+        return Err("A regular file is required".into());
+    }
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.custom_flags(0x00200000); // FILE_FLAG_OPEN_REPARSE_POINT
+    }
+    let file = options.open(path)?;
+    let m = file.metadata()?;
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        if m.file_attributes() & 0x400 != 0 {
+            return Err("Reparse points are not allowed in project files".into());
+        }
+    }
+    if !m.is_file() {
+        return Err("A regular file is required".into());
+    }
+    Ok(file)
+}
+
 // Reject links/reparse points on every existing component, including dangling
 // links. Generated files and history must never escape the selected project.
 pub fn safe(root: &Path, relative: &str) -> Result<PathBuf> {
@@ -15,6 +67,7 @@ pub fn safe(root: &Path, relative: &str) -> Result<PathBuf> {
     if relative.is_empty() || rel.components().any(|c| !matches!(c, Component::Normal(_))) {
         return Err("A project-relative path is required".into());
     }
+    regular_metadata(root)?;
     let mut p = root.to_path_buf();
     for c in rel.components() {
         p.push(c);
@@ -38,8 +91,12 @@ pub fn safe(root: &Path, relative: &str) -> Result<PathBuf> {
     Ok(p)
 }
 pub fn read_limited(path: &Path, limit: u64) -> Result<Vec<u8>> {
+    let file = open_regular(path)?;
+    if file.metadata()?.len() > limit {
+        return Err("File exceeds size limit".into());
+    }
     let mut b = Vec::new();
-    fs::File::open(path)?.take(limit + 1).read_to_end(&mut b)?;
+    file.take(limit.saturating_add(1)).read_to_end(&mut b)?;
     if b.len() as u64 > limit {
         return Err("File exceeds size limit".into());
     }
@@ -54,6 +111,44 @@ pub fn atomic(path: &Path, bytes: &[u8]) -> Result<()> {
     f.persist(path)?;
     Ok(())
 }
+// A shared project may contain a crafted bare repository. Checking only the
+// history.git directory itself does not protect its objects, refs or config.
+fn validate_history(root: &Path) -> Result<()> {
+    let base = ".gacchanko/history.git";
+    for redirect in [
+        "commondir",
+        "gitdir",
+        "objects/info/alternates",
+        "objects/info/http-alternates",
+    ] {
+        if safe(root, &format!("{base}/{redirect}"))?.exists() {
+            return Err("External history redirects are not supported".into());
+        }
+    }
+    let mut pending = vec![(base.to_string(), 0)];
+    let mut count = 0;
+    while let Some((rel, depth)) = pending.pop() {
+        let path = safe(root, &rel)?;
+        let m = regular_metadata(&path)?;
+        if depth > MAX_WALK_DEPTH {
+            return Err("History directory depth limit exceeded".into());
+        }
+        if m.is_dir() {
+            for entry in fs::read_dir(&path)? {
+                count += 1;
+                if count > 100_000 {
+                    return Err("History entry count limit exceeded".into());
+                }
+                let name = entry?
+                    .file_name()
+                    .into_string()
+                    .map_err(|_| "Invalid history filename")?;
+                pending.push((format!("{rel}/{name}"), depth + 1));
+            }
+        }
+    }
+    Ok(())
+}
 pub struct History {
     pub root: PathBuf,
     pub directory: PathBuf,
@@ -66,8 +161,14 @@ impl History {
         let directory = safe(&root, ".gacchanko/history.git")?;
         if !directory.exists() {
             fs::create_dir_all(directory.parent().unwrap())?;
-            Repository::init_bare(&directory)?;
+            Repository::init_opts(
+                &directory,
+                RepositoryInitOptions::new()
+                    .bare(true)
+                    .external_template(false),
+            )?;
         }
+        validate_history(&root)?;
         Repository::open_bare(&directory)?;
         Ok(Self {
             root,
@@ -77,7 +178,7 @@ impl History {
         })
     }
     fn repo(&self) -> Result<Repository> {
-        safe(&self.root, ".gacchanko/history.git")?;
+        validate_history(&self.root)?;
         // libgit2 never invokes Git hooks, external diff/textconv or executable filters.
         Ok(Repository::open_bare(&self.directory)?)
     }
@@ -89,12 +190,26 @@ impl History {
         let tree = commit.tree()?;
         let entry = tree.get_path(Path::new("graph.json"))?;
         let blob = repo.find_blob(entry.id())?;
+        if blob.size() > 10_000_000 {
+            return Err("History graph exceeds size limit".into());
+        }
         let g: PatchGraph = serde_json::from_slice(blob.content())?;
         validate(&g)?;
         Ok(Some(g))
     }
     pub fn files(&self) -> Result<Vec<String>> {
-        fn walk(root: &Path, rel: &str, out: &mut Vec<String>) -> Result<()> {
+        fn walk(
+            root: &Path,
+            rel: &str,
+            out: &mut Vec<String>,
+            entries: &mut usize,
+            total: &mut u64,
+            depth: usize,
+        ) -> Result<()> {
+            *entries += 1;
+            if *entries > MAX_WALK_ENTRIES || depth > MAX_WALK_DEPTH {
+                return Err("Project directory traversal limit exceeded".into());
+            }
             let p = safe(root, rel)?;
             if !p.exists() {
                 return Ok(());
@@ -103,6 +218,10 @@ impl History {
             if m.is_file() {
                 if m.len() > 20_000_000 {
                     return Err("History files must be at most 20 MB".into());
+                }
+                *total = total.saturating_add(m.len());
+                if *total > MAX_CHECKPOINT_BYTES {
+                    return Err("History checkpoint exceeds 100 MB limit".into());
                 }
                 out.push(rel.into());
                 if out.len() >= 10_000 {
@@ -116,7 +235,14 @@ impl History {
                     {
                         continue;
                     }
-                    walk(root, &format!("{rel}/{name}"), out)?;
+                    walk(
+                        root,
+                        &format!("{rel}/{name}"),
+                        out,
+                        entries,
+                        total,
+                        depth + 1,
+                    )?;
                 }
             } else {
                 return Err("History only accepts regular files and directories".into());
@@ -124,6 +250,8 @@ impl History {
             Ok(())
         }
         let mut out = vec![];
+        let mut entries = 0;
+        let mut total = 0;
         for name in [
             "graph.json",
             "AGENT_BRIEF.md",
@@ -133,7 +261,7 @@ impl History {
             "reports",
             "components",
         ] {
-            walk(&self.root, name, &mut out)?;
+            walk(&self.root, name, &mut out, &mut entries, &mut total, 0)?;
         }
         out.sort();
         Ok(out)
@@ -146,7 +274,7 @@ impl History {
         let mut files = BTreeMap::new();
         head.tree()?.walk(git2::TreeWalkMode::PreOrder, |root, e| {
             if e.kind() == Some(git2::ObjectType::Blob) {
-                if let Some(name) = e.name() {
+                if let Ok(name) = e.name() {
                     files.insert(format!("{root}{name}"), e.id());
                 }
             }
@@ -205,8 +333,13 @@ impl History {
         let files = self.files()?;
         let mut data = Vec::new();
         let mut manifest = String::new();
+        let mut total = 0u64;
         for p in files {
             let bytes = read_limited(&safe(&self.root, &p)?, 20_000_000)?;
+            total = total.saturating_add(bytes.len() as u64);
+            if total > MAX_CHECKPOINT_BYTES {
+                return Err("History checkpoint exceeds 100 MB limit".into());
+            }
             manifest += &format!("{p}:{}\n", hash(&bytes));
             data.push((p, bytes));
         }
@@ -238,7 +371,7 @@ impl History {
                 uid: 0,
                 gid: 0,
                 file_size: bytes.len() as u32,
-                id: Oid::zero(),
+                id: Oid::ZERO_SHA1,
                 flags: 0,
                 flags_extended: 0,
                 path: p.into_bytes(),
@@ -299,7 +432,7 @@ impl History {
             let date = chrono::DateTime::from_timestamp(c.time().seconds(), 0)
                 .map(|d| d.to_rfc3339())
                 .unwrap_or_default();
-            commits.push(json!({"id":c.id().to_string(),"date":date,"actor":c.author().name().unwrap_or(""),"message":c.summary().unwrap_or("")}));
+            commits.push(json!({"id":c.id().to_string(),"date":date,"actor":c.author().name().unwrap_or(""),"message":c.summary().ok().flatten().unwrap_or("")}));
         }
         let current = self.accepted("HEAD")?;
         let previous = self.accepted("HEAD^")?;

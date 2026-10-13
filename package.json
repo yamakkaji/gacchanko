@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build --features custom-protocol",
+    "build": "node scripts/build.cjs",
     "tauri": "tauri",
     "test:store": "cargo test --manifest-path src-tauri/Cargo.toml --no-default-features",
     "test:ui": "node tests/run-ui.cjs",

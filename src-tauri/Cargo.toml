@@ -31,7 +31,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dunce = "1"
 sha2 = "0.10"
-git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -39,3 +39,6 @@ tauri = { version = "2", optional = true, features = [] }
 tauri-plugin-dialog = { version = "2", optional = true }
 tauri-plugin-clipboard-manager = { version = "2", optional = true }
 tauri-plugin-opener = { version = "2", optional = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

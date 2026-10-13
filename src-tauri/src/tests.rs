@@ -281,9 +281,15 @@ fn inspection_distinguishes_files_from_directories_and_repositories() {
     fs::write(root.join("README.md"), "Parent project description").unwrap();
     let file = root.join("video.MOV");
     fs::write(&file, b"fixture").unwrap();
-    assert_eq!(inspect(root.to_str().unwrap()).unwrap()["kind"], "directory");
+    assert_eq!(
+        inspect(root.to_str().unwrap()).unwrap()["kind"],
+        "directory"
+    );
     fs::create_dir(root.join(".git")).unwrap();
-    assert_eq!(inspect(root.to_str().unwrap()).unwrap()["kind"], "repository");
+    assert_eq!(
+        inspect(root.to_str().unwrap()).unwrap()["kind"],
+        "repository"
+    );
     let result = inspect(file.to_str().unwrap()).unwrap();
     assert_eq!(result["kind"], "file");
     assert_eq!(result["description"], "");
@@ -292,7 +298,163 @@ fn inspection_distinguishes_files_from_directories_and_repositories() {
     let (_d, mut store) = fixture();
     let mut g = graph();
     g.nodes[0].kind = "file".into();
-    let revision = store.snapshot().unwrap()["revision"].as_str().unwrap().to_owned();
+    let revision = store.snapshot().unwrap()["revision"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     store.save(g, &revision, &[], true).unwrap();
-    assert_eq!(store.snapshot().unwrap()["project"]["nodes"][0]["kind"], "file");
+    assert_eq!(
+        store.snapshot().unwrap()["project"]["nodes"][0]["kind"],
+        "file"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn history_internal_symlinks_are_rejected_before_writing() {
+    use std::os::unix::fs::symlink;
+    let (d, mut s) = fixture();
+    let root = s.root.clone().unwrap();
+    let objects = root.join(".gacchanko/history.git/objects");
+    let outside = d.path().join("outside-objects");
+    fs::rename(&objects, &outside).unwrap();
+    symlink(&outside, &objects).unwrap();
+    fs::write(root.join("implementations/new.py"), "new content").unwrap();
+    assert!(s.poll().is_err(), "must not write objects through a link");
+    assert!(Store::default().open(&root).is_err());
+}
+
+#[test]
+fn history_redirects_are_rejected() {
+    for relative in [
+        "commondir",
+        "objects/info/alternates",
+        "objects/info/http-alternates",
+    ] {
+        let (_d, s) = fixture();
+        let root = s.root.as_ref().unwrap();
+        let path = root.join(".gacchanko/history.git").join(relative);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "../../outside\n").unwrap();
+        assert!(Store::default().open(root).is_err(), "{relative}");
+    }
+}
+
+#[test]
+fn checkpoint_total_size_and_depth_are_bounded() {
+    let (_d, mut s) = fixture();
+    let root = s.root.clone().unwrap();
+    let original = fs::read(root.join("graph.json")).unwrap();
+    let dir = root.join("implementations");
+    // Sparse files exercise the aggregate limit without allocating 100 MB.
+    for i in 0..6 {
+        fs::File::create(dir.join(format!("large-{i}")))
+            .unwrap()
+            .set_len(20_000_000)
+            .unwrap();
+    }
+    let mut g = s.graph.clone().unwrap();
+    g.description = "must not be written".into();
+    assert!(s.save(g, &s.revision.clone(), &[], true).is_err());
+    assert_eq!(fs::read(root.join("graph.json")).unwrap(), original);
+    fs::remove_dir_all(&dir).unwrap();
+    let mut nested = dir;
+    for _ in 0..34 {
+        nested.push("child");
+    }
+    fs::create_dir_all(nested).unwrap();
+    assert!(s.poll().is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn special_files_and_readme_links_do_not_block_or_leak() {
+    use std::{ffi::CString, os::unix::fs::symlink};
+    let d = tempfile::tempdir().unwrap();
+    let fifo = d.path().join("README.md");
+    let name = CString::new(fifo.as_os_str().as_encoded_bytes()).unwrap();
+    assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+    assert!(read_limited(&fifo, 100).is_err());
+    assert_eq!(
+        crate::store::inspect(d.path().to_str().unwrap()).unwrap()["description"],
+        ""
+    );
+    fs::remove_file(&fifo).unwrap();
+    let outside = tempfile::NamedTempFile::new().unwrap();
+    fs::write(outside.path(), "private content").unwrap();
+    symlink(outside.path(), &fifo).unwrap();
+    assert!(read_limited(&fifo, 100).is_err());
+    assert_eq!(
+        crate::store::inspect(d.path().to_str().unwrap()).unwrap()["description"],
+        ""
+    );
+    fs::remove_file(&fifo).unwrap();
+    fs::write(&fifo, "a".repeat(5000)).unwrap();
+    assert_eq!(
+        crate::store::inspect(d.path().to_str().unwrap()).unwrap()["description"]
+            .as_str()
+            .unwrap()
+            .len(),
+        3000
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn linked_history_config_and_replaced_project_root_are_rejected() {
+    use std::os::unix::fs::symlink;
+    let (d, mut s) = fixture();
+    let root = s.root.clone().unwrap();
+    let config = root.join(".gacchanko/history.git/config");
+    let outside = d.path().join("config");
+    fs::rename(&config, &outside).unwrap();
+    symlink(&outside, &config).unwrap();
+    assert!(s.poll().is_err());
+    fs::remove_file(&config).unwrap();
+    fs::rename(&outside, &config).unwrap();
+    let moved = d.path().join("moved");
+    fs::rename(&root, &moved).unwrap();
+    symlink(&moved, &root).unwrap();
+    assert!(s.poll().is_err());
+}
+
+#[test]
+fn ids_cannot_alias_output_paths() {
+    for id in ["CON", "nul", "COM1", "LPT9"] {
+        assert!(!valid_id(id), "reserved ID: {id}");
+    }
+    let mut g = graph();
+    g.nodes[1].id = "A".into();
+    g.edges[0].target = "A".into();
+    assert!(
+        validate(&g).is_err(),
+        "case-insensitive directory collision"
+    );
+    let mut g = graph();
+    g.edges[0].id = "Shared".into();
+    assert!(validate(&g).is_err(), "reserved shared code directory");
+}
+
+#[test]
+fn specification_expansion_is_rejected_before_replacing_graph() {
+    let (_d, mut s) = fixture();
+    let root = s.root.clone().unwrap();
+    let before = fs::read(root.join("graph.json")).unwrap();
+    let mut g = graph();
+    g.nodes[0].description = "x".repeat(1_000_000);
+    let edge = g.edges[0].clone();
+    g.edges = (0..40)
+        .map(|i| {
+            let mut e = edge.clone();
+            e.id = format!("e{i}");
+            e
+        })
+        .collect();
+    assert!(s
+        .save(g, &s.revision.clone(), &[], false)
+        .unwrap_err()
+        .to_string()
+        .contains("size budget"));
+    assert_eq!(fs::read(root.join("graph.json")).unwrap(), before);
+    assert!(!root.join("connections/e1").exists());
 }

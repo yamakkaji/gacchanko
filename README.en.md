@@ -213,6 +213,8 @@ This example requires Python 3.10 or later. A working reference implementation i
 
 Gacchanko is an experimental application for designing with graphs, handing work to agents, and reviewing implementation results.
 
+See the [security review](docs/security-review.md) (Japanese) for findings and protection boundaries. Project history accepts files up to 20 MB each and 100 MB in total. Generated specification expansion is also bounded; keep models and large datasets outside the project and reference them instead.
+
 - **Code generation and execution happen on the agent side.** The application contains neither an LLM nor an execution scheduler. Synchronous and asynchronous settings describe requirements for the generated code.
 - **Agent handoff is manual.** Paste the copied request into your existing agent session. The application does not automatically send messages to a chat.
 - **Referenced code is not automatically analyzed.** Adding a folder imports the beginning of its README into the description. The agent investigates APIs and ports. Entering a URL does not automatically clone a repository.

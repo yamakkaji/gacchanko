@@ -1,6 +1,6 @@
 use crate::{
     graph::*,
-    history::{atomic, read_limited, safe, History},
+    history::{atomic, open_regular, read_limited, safe, History},
     model::*,
     Result,
 };
@@ -166,6 +166,41 @@ impl Store {
         self.snapshot()
     }
     fn preflight(&self, g: &PatchGraph) -> Result<()> {
+        // Descriptions and template instructions are repeated in generated specs.
+        // Bound that expansion before writing even the first output file.
+        let origin_size = |o: &Option<TemplateOrigin>| -> usize {
+            o.as_ref()
+                .and_then(|o| {
+                    g.templates
+                        .as_deref()
+                        .unwrap_or(&[])
+                        .iter()
+                        .find(|t| t.id == o.template_id && t.version == o.version)
+                })
+                .map(|t| t.instructions.len())
+                .unwrap_or(0)
+        };
+        let mut estimate = bytes(g)?.len() as u64 + 20_000;
+        let node_sizes: std::collections::HashMap<_, _> = g
+            .nodes
+            .iter()
+            .map(|n| Ok((n.id.as_str(), bytes(n)?.len() as u64)))
+            .collect::<Result<_>>()?;
+        for n in &g.nodes {
+            estimate += 10_000
+                + 4 * node_sizes[n.id.as_str()]
+                + 2 * (g.description.len() + origin_size(&n.derived_from)) as u64;
+        }
+        for e in &g.edges {
+            estimate += 10_000
+                + 3 * bytes(e)?.len() as u64
+                + 3 * (node_sizes.get(e.source.as_str()).copied().unwrap_or(0)
+                    + node_sizes.get(e.target.as_str()).copied().unwrap_or(0))
+                + 2 * (g.description.len() + origin_size(&e.derived_from)) as u64;
+        }
+        if estimate > crate::history::MAX_CHECKPOINT_BYTES {
+            return Err("Generated specifications exceed the project size budget".into());
+        }
         for p in [
             "graph.json",
             "AGENT_BRIEF.md",
@@ -608,7 +643,9 @@ pub fn inspect(raw: &str) -> Result<Value> {
     let path = dunce::canonicalize(path)?;
     let metadata = fs::metadata(&path)?;
     if metadata.is_file() {
-        return Ok(json!({"path":path,"name":path.file_name().unwrap_or_default().to_string_lossy(),"kind":"file","description":"","files":[]}));
+        return Ok(
+            json!({"path":path,"name":path.file_name().unwrap_or_default().to_string_lossy(),"kind":"file","description":"","files":[]}),
+        );
     }
     if !metadata.is_dir() {
         return Err("Only regular files and directories are supported".into());
@@ -626,11 +663,7 @@ pub fn inspect(raw: &str) -> Result<Value> {
         .and_then(|p| {
             use std::io::Read;
             let mut b = vec![];
-            fs::File::open(p)
-                .ok()?
-                .take(4096)
-                .read_to_end(&mut b)
-                .ok()?;
+            open_regular(&p).ok()?.take(4096).read_to_end(&mut b).ok()?;
             Some(
                 String::from_utf8_lossy(&b)
                     .chars()

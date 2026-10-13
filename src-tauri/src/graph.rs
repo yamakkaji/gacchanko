@@ -61,7 +61,13 @@ pub fn fingerprint(g: &PatchGraph, member: &Value, node: bool) -> String {
     hash(&serde_json::to_vec(&canonical(&payload)).unwrap())
 }
 pub fn valid_id(s: &str) -> bool {
-    !s.is_empty()
+    let upper = s.to_ascii_uppercase();
+    let reserved = ["CON", "PRN", "AUX", "NUL"].contains(&upper.as_str())
+        || ((upper.starts_with("COM") || upper.starts_with("LPT"))
+            && upper.len() == 4
+            && matches!(upper.as_bytes()[3], b'1'..=b'9'));
+    !reserved
+        && !s.is_empty()
         && s.len() <= 80
         && s.bytes()
             .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
@@ -94,10 +100,19 @@ pub fn validate(g: &PatchGraph) -> Result<()> {
     ] {
         check(
             ids.iter().all(|s| valid_id(s))
-                && ids.iter().collect::<HashSet<_>>().len() == ids.len(),
+                && ids
+                    .iter()
+                    .map(|s| s.to_ascii_lowercase())
+                    .collect::<HashSet<_>>()
+                    .len()
+                    == ids.len(),
             "Invalid or duplicate component ID",
         )?;
     }
+    check(
+        !g.edges.iter().any(|e| e.id.eq_ignore_ascii_case("shared")),
+        "Edge ID conflicts with shared implementation directory",
+    )?;
     let templates = g.templates.as_deref().unwrap_or(&[]);
     check(templates.len() <= 200, "Too many template versions")?;
     let mut keys = HashSet::new();
@@ -105,7 +120,7 @@ pub fn validate(g: &PatchGraph) -> Result<()> {
         check(
             valid_id(&t.id)
                 && t.version > 0
-                && keys.insert((t.id.clone(), t.version))
+                && keys.insert((t.id.to_ascii_lowercase(), t.version))
                 && !t.name.is_empty()
                 && !t.nodes.is_empty(),
             "Invalid template",

@@ -381,6 +381,7 @@ fn main() {
                             || (["http", "https"].contains(&url.scheme())
                                 && url.host_str() == Some("tauri.localhost"))
                     })
+                    .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
                     .on_page_load(|web, payload| {
                         #[cfg(debug_assertions)]
                         if test_output().is_some()

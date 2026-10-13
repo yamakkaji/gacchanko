@@ -213,7 +213,7 @@ impl Store {
                 &format!("components/nodes/{}/SPEC.md", n.id),
                 spec.as_bytes(),
             )?;
-            brief+=&format!("\n### {} [{}]\n- Specification: components/nodes/{}/SPEC.md\n- Location: {}\n- Policy: {}\n\n{}\n",n.name,n.id,n.id,n.path,n.policy.as_deref().unwrap_or("mutable"),n.description);
+            brief += &format!("\n### {} [{}]\n- Policy: {}\n- Design instructions: {}\n- Template origin: {}\n- Kind: {}\n- Implementation state (user-declared): {}\n- Location: {}\n- Command (not auto-executed): {}\n- Inputs: {}\n- Outputs: {}\n\n{}\n", n.name,n.id,n.policy.as_deref().unwrap_or("mutable"),n.design_instructions.as_deref().unwrap_or(""),origin(&n.derived_from),n.kind,n.implementation_state.as_deref().unwrap_or("unspecified"),if n.path.is_empty(){"Not set"}else{&n.path},n.command,n.inputs.join(", "),n.outputs.join(", "),n.description);
         }
         brief += "\n## Connection components\n";
         for e in &g.edges {
@@ -290,7 +290,10 @@ impl Store {
                     format!("n{j}")
                 } else {
                     let key = format!("loose{i}{s}");
-                    mermaid += &format!("  {key}[\"Unconnected\"]\n");
+                    mermaid += &format!(
+                        "  {key}[\"Unconnected {}\"]\n",
+                        if s == "s" { "output" } else { "input" }
+                    );
                     key
                 });
             }
@@ -339,21 +342,21 @@ impl Store {
             result[hashes][id] = json!(fp);
             let path = self.path(&path)?;
             if path.exists() {
-                let mut report = read_limited(&path, 1_000_000)
+                let Some(mut report) = read_limited(&path, 1_000_000)
                     .ok()
                     .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
                     .filter(|v| v.is_object())
-                    .unwrap_or(json!({"status":"blocked","summary":"Cannot read report JSON"}));
+                else {
+                    result[map][id] =
+                        json!({"status":"blocked","summary":"レポートの JSON を読み取れません。"});
+                    continue;
+                };
                 if !["implemented", "verified", "blocked"]
                     .contains(&report["status"].as_str().unwrap_or(""))
                 {
                     report["status"] = json!("pending");
                 }
-                if report.get("fingerprint").is_some() {
-                    if report["fingerprint"] != fp {
-                        report["status"] = json!("stale");
-                    }
-                } else if report["summary"] != "Cannot read report JSON" {
+                if report["fingerprint"] != fp {
                     report["status"] = json!("stale");
                 }
                 if self
@@ -362,8 +365,11 @@ impl Store {
                     .is_some_and(|h| h.protected_files.iter().any(|p| p.starts_with(&scope)))
                 {
                     report["status"] = json!("blocked");
-                    report["summary"] =
-                        json!("External modification of protected implementation detected");
+                    report["summary"] = json!(if node {
+                        "保護されたノード実装への外部変更を検出しました。"
+                    } else {
+                        "保護された実装への外部変更を検出しました。履歴への採用を停止しています。"
+                    });
                 }
                 result[map][id] = report;
             }

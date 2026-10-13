@@ -36,6 +36,15 @@ jobs:
       - run: npm ci
       - run: npm run test:store
       - run: npm run test:ui
+      - name: Compare Swift and Rust project stores
+        if: matrix.target == 'aarch64-apple-darwin'
+        run: |
+          mkdir -p .build/module-cache
+          xcrun swiftc -module-cache-path .build/module-cache Sources/Localization.swift Sources/Project.swift tests/parity-driver/main.swift -o .build/parity-driver
+          xcrun swiftc -module-cache-path .build/module-cache Sources/Localization.swift Sources/Project.swift tests/store-driver/main.swift -o .build/store-driver
+          cargo build --manifest-path src-tauri/Cargo.toml --no-default-features --examples
+          node tests/store-parity.cjs
+          node tests/tauri-compat.cjs
       - run: npm run build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundle }} --ci
       - uses: actions/upload-artifact@v4
         with:

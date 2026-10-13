@@ -202,6 +202,14 @@
   document.querySelector('#modal').close();
   await P.save(false);
   window.gacchankoAppearance.save(originalAppearance);
+  if(window.gacchankoHost.platform==='tauri') {
+    await P.changeLanguage('en');check(document.documentElement.lang==='en','Tauri language and native menu switch');
+    const nodePrompt=await P.call('copyPrompt',{nodeID:P.graph.nodes[0].id});
+    check(nodePrompt.includes('context only')&&nodePrompt.includes('report.json'),'Tauri node handoff preserves scope');
+    await P.changeLanguage('ja');
+    const state=await P.call('state');const detail=await P.call('historyDetail',{id:state.history.head});
+    check(typeof detail.diff==='string'&&detail.diff.length>0,'Tauri native Git history diff');
+  }
   await P.call('testFinish',{ok:true,checks,project:P.root});
  }catch(error){window.gacchankoAppearance.save(originalAppearance);await P.call('testFinish',{ok:false,checks,error:error.stack||String(error)});}
 })();

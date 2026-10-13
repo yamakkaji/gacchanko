@@ -107,6 +107,14 @@ fn rpc(app: &tauri::AppHandle, command: &str, args: &Value) -> Result<Value> {
     #[cfg(debug_assertions)]
     if let Some(output) = test_output() {
         match command {
+            "testCreate" => {
+                let project = output
+                    .parent()
+                    .ok_or("Test output needs a parent directory")?
+                    .join(format!("ui-{}.gacchanko", uuid::Uuid::new_v4()));
+                let graph = serde_json::from_value(args["graph"].clone())?;
+                return state.store.lock().unwrap().create(&project, graph);
+            }
             "testReport" => {
                 let store = state.store.lock().unwrap();
                 let snapshot = store.snapshot()?;
@@ -321,9 +329,7 @@ fn main() {
                     .parent()
                     .unwrap()
                     .join(format!("ui-{}.gacchanko", uuid::Uuid::new_v4()));
-                let graph = serde_json::from_str(include_str!(
-                    "../../examples/Multimodal-agent.gacchanko/graph.json"
-                ))?;
+                let graph=serde_json::from_value(json!({"schemaVersion":1,"name":"UI test","description":"","nodes":[],"edges":[]}))?;
                 app.state::<Session>()
                     .store
                     .lock()
@@ -351,14 +357,14 @@ fn main() {
                         if test_output().is_some()
                             && matches!(payload.event(), tauri::webview::PageLoadEvent::Finished)
                         {
-                            let _ = web.eval(include_str!("../../tests/tauri-native-smoke.js"));
+                            let _ = web.eval(include_str!("../../tests/ui-smoke.js"));
                         }
                         #[cfg(not(debug_assertions))]
                         let _ = (web, payload);
                     });
             #[cfg(debug_assertions)]
             let builder = if let Some(output) = test_output() {
-                builder.data_directory(output.parent().unwrap().join("webview-test-data"))
+                builder.incognito(true).title("gacchanko — automatic UI test").data_directory(output.parent().unwrap().join("webview-test-data"))
             } else {
                 builder
             };

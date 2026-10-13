@@ -7,7 +7,8 @@
     "build": "tauri build --features custom-protocol",
     "tauri": "tauri",
     "test:store": "cargo test --manifest-path src-tauri/Cargo.toml --no-default-features",
-    "test:ui": "node tests/run-ui.cjs"
+    "test:ui": "node tests/run-ui.cjs",
+    "test:native": "node tests/run-native.cjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",

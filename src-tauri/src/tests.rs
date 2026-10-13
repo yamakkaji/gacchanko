@@ -232,3 +232,43 @@ fn node_implementation_protection_and_report() {
     .unwrap();
     assert_eq!(s.poll().unwrap()["nodeReports"]["a"]["status"], "blocked");
 }
+
+#[test]
+fn brief_preserves_node_template_context_and_invalid_report_status() {
+    let (_d, mut s) = fixture();
+    let mut g = s.graph.clone().unwrap();
+    let instructions = "Retain these roles in every variant";
+    g.templates = Some(vec![crate::model::GraphTemplate {
+        id: "prototype".into(),
+        version: 1,
+        name: "Original".into(),
+        instructions: instructions.into(),
+        nodes: g.nodes.clone(),
+        edges: g.edges.clone(),
+    }]);
+    g.nodes[0].derived_from = Some(crate::model::TemplateOrigin {
+        template_id: "prototype".into(),
+        version: 1,
+        member_id: "a".into(),
+    });
+    g.nodes[0].design_instructions = Some("Specialize the observation format".into());
+    g.nodes[0].command = "python input.py".into();
+    s.save(g, &s.revision.clone(), &[], true).unwrap();
+    let root = s.root.as_ref().unwrap();
+    let brief = fs::read_to_string(root.join("AGENT_BRIEF.md")).unwrap();
+    for text in [
+        instructions,
+        "Specialize the observation format",
+        "python input.py",
+        "Inputs: in",
+        "Outputs: out",
+    ] {
+        assert!(brief.contains(text), "{text}");
+    }
+    fs::write(
+        root.join("reports/e.json"),
+        json!({"status":"verified","summary":"Cannot read report JSON"}).to_string(),
+    )
+    .unwrap();
+    assert_eq!(s.snapshot().unwrap()["reports"]["e"]["status"], "stale");
+}

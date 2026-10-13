@@ -276,12 +276,10 @@ Rustの保存処理のテストでは、保存・仕様書・レポート・履�
 実際のWebViewとRustを通すテストはGUIを起動できる環境で実行します。以下はmacOSの例です。テスト専用コマンドはデバッグビルドにのみ含まれます。
 
 ```sh
-cargo build --manifest-path src-tauri/Cargo.toml --bin gacchanko
-mkdir -p .qa/tauri
-./src-tauri/target/debug/gacchanko --ui-test "$PWD/.qa/tauri/native-result.json"
+npm run test:native
 ```
 
-ネイティブのファイル選択、ドラッグ＆ドロップ、終了確認、Windowsの表示倍率とパスの扱いは実機で確認してください。テストで生成した `verified` レポートはテスト用fixtureであり、エージェント実装の検証結果ではありません。
+Swift版との比較結果・既知の差分は[互換性とテスト範囲](docs/tauri-parity.md)に記載しています。ネイティブのファイル選択、ドラッグ＆ドロップ、終了確認、Windowsの表示倍率とパスの扱いは実機で確認してください。テストで生成した `verified` レポートはテスト用fixtureであり、エージェント実装の検証結果ではありません。
 
 Swift版とのfingerprint・履歴互換テストはmacOSで実行できます。
 

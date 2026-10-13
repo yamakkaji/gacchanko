@@ -1,0 +1,41 @@
+[package]
+name = "gacchanko"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.90"
+default-run = "gacchanko"
+
+[lib]
+name = "gacchanko_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "gacchanko"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[[example]]
+name = "store-driver"
+path = "examples/store-driver.rs"
+
+[features]
+default = ["desktop"]
+custom-protocol = ["tauri/custom-protocol"]
+desktop = ["dep:tauri", "dep:tauri-plugin-dialog", "dep:tauri-plugin-clipboard-manager", "dep:tauri-plugin-opener"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dunce = "1"
+sha2 = "0.10"
+git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
+tempfile = "3"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+tauri = { version = "2", optional = true, features = [] }
+tauri-plugin-dialog = { version = "2", optional = true }
+tauri-plugin-clipboard-manager = { version = "2", optional = true }
+tauri-plugin-opener = { version = "2", optional = true }

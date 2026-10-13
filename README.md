@@ -6,7 +6,7 @@
 
 がっちゃんこ自体にLLMのAPIキーは必要ありません。設計と生成された実装は、ローカルのプロジェクトとして管理できます。
 
-現在はmacOS向けの実験的なアプリケーションです。接続コードの生成には、対象のローカルファイルを読み書きできるAIコーディングエージェントを別途用意してください。
+Tauri 2を使った実験的なデスクトップアプリケーションです。macOS版をローカルでビルド検証し、Windows版のビルドはGitHub Actionsに対応しています。Windowsでの実機動作は未検証です。接続コードの生成には、対象のローカルファイルを読み書きできるAIコーディングエージェントを別途用意してください。
 
 ## 目次
 
@@ -55,32 +55,34 @@
 
 ## インストールと起動
 
-ソースからビルドするには、macOSとXcode Command Line Tools（Swiftコンパイラ、Git）が必要です。現在の実装はmacOS向けで、Windows・Linuxには対応していません。
+配布用インストーラーは [GitHub Releases](https://github.com/yamakkaji/gacchanko/releases) で公開します。対応するリリースがまだない場合は、以下の手順でソースからビルドしてください。GitHub Actionsの「Desktop builds」でもビルド成果物を取得できます。
 
-Command Line Toolsをまだ導入していない場合は、ターミナルで次を実行し、表示される案内に従ってください。
+**配布済みのTauri版を使うだけなら、Rust・Node.js・Git・Xcode Command Line Toolsは不要です。** Git履歴の処理はアプリに組み込んだlibgit2が行います。接続するプログラムや生成コードに必要な実行環境は別途用意してください。
 
-```sh
-xcode-select --install
-```
+ソースからのビルドにはNode.js、npm、Rust stableと、[TauriのOS別ビルド環境](https://v2.tauri.app/start/prerequisites/)が必要です。
 
-リポジトリを取得してビルドし、アプリを開きます。
+- macOS 13以降：Xcode Command Line Tools。Tauriでも開発・ビルド時には必要です。
+- Windows：Visual Studio C++ Build ToolsとWebView2。配布インストーラーはWebView2がない場合にダウンロードできます。
+- Linux：今回の配布・実機検証の対象外です。
 
 ```sh
 git clone https://github.com/yamakkaji/gacchanko.git
 cd gacchanko
-./build.sh
-open dist/gacchanko.app
+npm ci
+npm run dev
 ```
 
-ビルドした `dist/gacchanko.app` は単体で起動できます。がっちゃんこ本体の実行にPython、Node.js、npm、uvは不要です。プロジェクトの自動履歴にはGitを使用します。接続するプログラムや生成されたコードに必要な実行環境は、それぞれ別途用意してください。
-
-更新時はアプリを終了してから、リポジトリ内で次を実行します。
+配布用ビルド：
 
 ```sh
-git pull --ff-only
-./build.sh
-open dist/gacchanko.app
+npm run build
 ```
+
+生成先は `src-tauri/target/release/bundle/` です。macOSでは `macos/gacchanko.app` とDMG、Windowsではインストーラーが生成されます。OSごとのビルド環境で実行してください。
+
+更新時はアプリを終了して `git pull --ff-only`、`npm ci`、`npm run build` を実行します。
+
+従来のSwift版は `Sources/` と `build.sh` に残しています。Macで `./build.sh` を実行すると `dist/gacchanko.app` が生成されます。既存の `.gacchanko` プロジェクト形式はTauri版と共通ですが、外観・言語などアプリ側の設定は保存領域が異なるため再設定してください。同じプロジェクトを両方のアプリで同時に編集することは避けてください。
 
 作成する `.gacchanko` プロジェクトは、このリポジトリの外へ保存すると、アプリのソースと分けて管理できます。
 
@@ -103,7 +105,7 @@ open dist/gacchanko.app
 
 ## 言語とチュートリアル
 
-「設定 → Language / 言語」で日本語と英語を切り替えられます。画面・アプリのメニュー・エージェントへの依頼文に反映され、次回起動時も選択を保持します。ノード名や説明など、プロジェクトに記入した内容は翻訳されません。OS標準のファイル選択画面の一部はmacOSの言語設定に従います。
+「設定 → Language / 言語」で日本語と英語を切り替えられます。画面・アプリのメニュー・エージェントへの依頼文に反映され、次回起動時も選択を保持します。ノード名や説明など、プロジェクトに記入した内容は翻訳されません。OS標準のファイル選択画面の一部はOSの言語設定に従います。
 
 使い方はアプリ内の「チュートリアル」でも確認できます。ノードとエッジ、追加と接続、Inspector、保存とエージェントへの受け渡し、結果の確認を6ステップで案内します。チュートリアルは上部メニュー、左下のボタン、空のキャンバス、ヘルプから開けます。
 
@@ -263,48 +265,44 @@ open dist/gacchanko.app
 ## 開発と検証
 
 ```sh
-./build.sh
-./dist/gacchanko.app/Contents/MacOS/gacchanko --self-test
+npm ci
+npm run test:store
+npm run test:ui
+npm run dev
 ```
 
-Swift のコアテストでは、保存の往復、仕様書生成、レポート読み込み、仕様変更の検知、外部変更との競合、パス検査、削除時のコード保持に加え、Git履歴、原型の版管理、保護解除、外部変更・実装変更の保護などを検証します。
+Rustの保存処理のテストでは、保存・仕様書・レポート・履歴、外部提案の比較と部分採用、再起動後の提案保持、immutable保護、明示的な保護解除、シンボリックリンクへの書き込み拒否を確認します。UIテストでは既存の編集操作に加え、Tauriアダプターの通信とイベントも確認します。
 
-UI の DOM テストには開発用の `jsdom@26.1.0` が必要です。
+実際のWebViewとRustを通すテストはGUIを起動できる環境で実行します。以下はmacOSの例です。テスト専用コマンドはデバッグビルドにのみ含まれます。
 
 ```sh
-npm install --prefix .qa --no-save jsdom@26.1.0
-NODE_PATH="$PWD/.qa/node_modules" node tests/dom-test.cjs
-NODE_PATH="$PWD/.qa/node_modules" node tests/appearance-test.cjs
-NODE_PATH="$PWD/.qa/node_modules" node tests/design-ui-test.cjs
-NODE_PATH="$PWD/.qa/node_modules" node tests/viewport-test.cjs
-NODE_PATH="$PWD/.qa/node_modules" node tests/connection-test.cjs
-NODE_PATH="$PWD/.qa/node_modules" node tests/language-test.cjs
+cargo build --manifest-path src-tauri/Cargo.toml --bin gacchanko
+mkdir -p .qa/tauri
+./src-tauri/target/debug/gacchanko --ui-test "$PWD/.qa/tauri/native-result.json"
 ```
 
-このテストではネイティブブリッジを模擬して、ポート接続、入力、保存への受け渡し、レポート表示、複数選択、範囲選択、グループ移動・削除、パン、矢印、Undo / Redo などを検証します。表示設定の保存・復元、設定値の検査、折り返し・ループでのグラデーションも検証します。実際の macOS ウィンドウや Finder のドラッグ＆ドロップを検証するものではありません。
+ネイティブのファイル選択、ドラッグ＆ドロップ、終了確認、Windowsの表示倍率とパスの扱いは実機で確認してください。テストで生成した `verified` レポートはテスト用fixtureであり、エージェント実装の検証結果ではありません。
 
-GUI を起動できる開発環境では、実際の WebKit とネイティブブリッジを使う追加のテストも用意しています。
+Swift版とのfingerprint・履歴互換テストはmacOSで実行できます。
 
 ```sh
-open -n dist/gacchanko.app --args --ui-test "$PWD/tests/native-ui-result.json"
+mkdir -p .build/module-cache
+xcrun swiftc -module-cache-path .build/module-cache Sources/Localization.swift Sources/Project.swift tests/store-driver/main.swift -o .build/store-driver
+cargo build --manifest-path src-tauri/Cargo.toml --no-default-features --example store-driver
+node tests/tauri-compat.cjs
 ```
 
-DOMテストではネイティブのファイル選択ダイアログやFinderのドロップ操作は検証されません。これらはmacOS上で確認してください。
-
-グラフを外部で変更した後、GUI を使わず指示書を更新するには次を実行できます。
-
-```sh
-./dist/gacchanko.app/Contents/MacOS/gacchanko --refresh /absolute/path/to/project.gacchanko
-```
-
-フロントエンドは `web/`、macOS シェルは `Sources/main.swift`、保存と指示書生成は `Sources/Project.swift` にあります。
+GitHub ActionsはMac（Apple Silicon / Intel）とWindows x64をビルドします。`v*` タグをpushすると、成功したインストーラーを下書きのGitHub Releaseへ添付します。公開前に実機確認とリリース内容の確認を行ってください。現時点ではApple Developer ID署名・公証、Windowsコード署名は設定していません。配布時の注意は[リリース案内](docs/tauri-release.md)を参照してください。
 
 <a id="tauri"></a>
 
 ## 実装構成
 
-画面はHTML / CSS / JavaScript、macOSアプリのホストとファイル管理はSwiftで実装しています。Webサーバーを常駐させず、`.app`として起動します。
+画面はHTML / CSS / JavaScript、デスクトップのホストと保存処理はTauri 2 / Rustです。WebサーバーやNode.jsを常駐させず、OSのWebViewで画面を表示します。
 
-画面とデスクトップ機能の通信は `web/bridge.js` へ分離しています。Tauri / Rustなど別のホストへの移植を考慮した構成ですが、Tauri版はまだありません。
+- `web/`：共通のグラフ編集画面。`tauri.js` がTauriを検出し、`bridge.js` の共通インターフェースへ接続します。
+- `src-tauri/src/main.rs`：ファイル選択、クリップボード、ドロップ、メニュー、終了確認。
+- `src-tauri/src/store.rs`、`graph.rs`、`history.rs`：保存、仕様書、検証、fingerprint、libgit2によるプロジェクト内の履歴。
+- `Sources/`：比較・互換確認用に保持している従来のSwift版。
 
 通信コマンドと各部分の役割は[設計文書](docs/architecture.md)を参照してください。

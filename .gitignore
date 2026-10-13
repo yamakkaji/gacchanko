@@ -13,3 +13,8 @@ __pycache__/
 
 # Archived legacy artifacts are retained locally.
 /legacy/
+
+# Tauri build outputs and dependencies
+node_modules/
+src-tauri/target/
+src-tauri/gen/

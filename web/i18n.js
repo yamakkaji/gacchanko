@@ -227,7 +227,7 @@ window.gacchankoI18n=(()=>{
   "新規プロジェクト": "New project",
   "開く": "Open",
   "保存": "Save",
-  "Finderで開く": "Reveal in Finder",
+  "フォルダを表示": "Show in file manager",
   "編集": "Edit",
   "元に戻す": "Undo",
   "やり直す": "Redo",

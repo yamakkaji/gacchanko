@@ -1,0 +1,234 @@
+use crate::{graph::*, history::*, model::PatchGraph, store::Store};
+use serde_json::json;
+use std::fs;
+fn graph() -> PatchGraph {
+    serde_json::from_value(json!({"schemaVersion":1,"name":"Test","description":"画像と音声 / text","nodes":[{"id":"a","name":"Input","path":"","kind":"planned","description":"input","command":"","inputs":["in"],"outputs":["out"],"x":1.5,"y":20,"policy":"mutable"},{"id":"b","name":"Agent","path":"","kind":"planned","description":"agent","command":"","inputs":["in"],"outputs":["out"],"x":200,"y":20}],"edges":[{"id":"e","source":"a","target":"b","sourcePort":"out","targetPort":"in","label":"input","intent":"deliver text","mode":"data","layer":"data","policy":"mutable"}]})).unwrap()
+}
+fn fixture() -> (tempfile::TempDir, Store) {
+    let dir = tempfile::tempdir().unwrap();
+    let mut s = Store::default();
+    s.create(&dir.path().join("test.gacchanko"), graph())
+        .unwrap();
+    (dir, s)
+}
+fn external(s: &Store, g: &PatchGraph) -> String {
+    let data = bytes(g).unwrap();
+    fs::write(s.root.as_ref().unwrap().join("graph.json"), &data).unwrap();
+    hash(&data)
+}
+#[test]
+fn roundtrip_specs_reports_history() {
+    let (_d, mut s) = fixture();
+    let root = s.root.clone().unwrap();
+    let snap = s.snapshot().unwrap();
+    assert!(root.join("components/nodes/a/SPEC.md").exists());
+    assert!(root.join("connections/e/SPEC.md").exists());
+    assert!(!snap["history"]["commits"].as_array().unwrap().is_empty());
+    let report = json!({"fingerprint":snap["fingerprints"]["e"],"status":"verified","summary":"actual check","checks":["test"],"files":[]});
+    fs::write(root.join("reports/e.json"), report.to_string()).unwrap();
+    assert_eq!(s.poll().unwrap()["reports"]["e"]["status"], "verified");
+    let mut g = s.graph.clone().unwrap();
+    g.edges[0].intent = "different".into();
+    s.save(g, &s.revision.clone(), &[], true).unwrap();
+    assert_eq!(s.snapshot().unwrap()["reports"]["e"]["status"], "stale");
+    let id = s.snapshot().unwrap()["history"]["head"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(s.history.as_ref().unwrap().detail(&id).unwrap()["diff"]
+        .as_str()
+        .unwrap()
+        .contains("different"));
+}
+#[test]
+fn stale_save_rejected_and_proposal_survives_restart() {
+    let (_d, mut s) = fixture();
+    let old = s.graph.clone().unwrap();
+    let mut next = old.clone();
+    next.nodes[0].description = "agent proposal".into();
+    let rev = external(&s, &next);
+    assert!(s.save(old.clone(), &s.revision.clone(), &[], true).is_err());
+    assert!(s.poll().unwrap()["externalChange"].as_bool().unwrap());
+    let mut reopened = Store::default();
+    let state = reopened.open(s.root.as_ref().unwrap()).unwrap();
+    assert!(state.get("pendingExternal").is_some());
+    assert_eq!(state["project"]["nodes"][0]["description"], "input");
+    reopened.adopt(&rev, &["node:a".into()]).unwrap();
+    assert_eq!(
+        reopened.graph.unwrap().nodes[0].description,
+        "agent proposal"
+    );
+}
+#[test]
+fn partial_adopt_and_reject_preserve_archive() {
+    let (_d, mut s) = fixture();
+    let mut g = s.graph.clone().unwrap();
+    g.nodes[0].description = "adopt".into();
+    g.nodes[1].description = "skip".into();
+    let rev = external(&s, &g);
+    s.adopt(&rev, &["node:a".into()]).unwrap();
+    assert_eq!(s.graph.as_ref().unwrap().nodes[0].description, "adopt");
+    assert_eq!(s.graph.as_ref().unwrap().nodes[1].description, "agent");
+    let rev = external(&s, &g);
+    s.reject(&rev).unwrap();
+    assert_eq!(s.graph.as_ref().unwrap().nodes[1].description, "agent");
+    let root = s.root.as_ref().unwrap();
+    assert_eq!(
+        fs::read_dir(root.join(".gacchanko/proposals"))
+            .unwrap()
+            .count(),
+        1
+    );
+    assert_eq!(
+        fs::read_dir(root.join(".gacchanko/rejected"))
+            .unwrap()
+            .count(),
+        1
+    );
+}
+#[test]
+fn immutable_design_and_code_are_enforced() {
+    let (_d, mut s) = fixture();
+    let mut g = s.graph.clone().unwrap();
+    g.nodes[0].policy = Some("immutable".into());
+    g.edges[0].policy = Some("immutable".into());
+    s.save(g.clone(), &s.revision.clone(), &[], true).unwrap();
+    let mut changed = g.clone();
+    changed.nodes[0].description = "violation".into();
+    assert!(s.save(changed, &s.revision.clone(), &[], true).is_err());
+    let mut layout = g.clone();
+    layout.nodes[0].x += 1.0;
+    s.save(layout, &s.revision.clone(), &[], true).unwrap();
+    let root = s.root.as_ref().unwrap();
+    fs::create_dir_all(root.join("implementations/e")).unwrap();
+    fs::write(root.join("implementations/e/code.py"), "print('changed')").unwrap();
+    s.poll().unwrap();
+    assert_eq!(
+        s.snapshot().unwrap()["history"]["protectedFiles"][0],
+        "implementations/e/code.py"
+    );
+    let rev = s.revision.clone();
+    s.unlock("edge", "e", &rev).unwrap();
+    assert!(s.snapshot().unwrap()["history"]["protectedFiles"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(s.graph.as_ref().unwrap().nodes[0].policy.as_deref() == Some("immutable"));
+}
+#[test]
+fn protected_wiring_and_template_versions() {
+    let mut g = graph();
+    g.nodes[0].policy = Some("immutable".into());
+    let mut next = g.clone();
+    next.edges.clear();
+    assert!(violations(&g, &next, &[])
+        .iter()
+        .any(|v| v.starts_with("wiring:")));
+    let mut v = value(&g);
+    v["templates"] = json!([{"id":"base","version":1,"name":"Base","instructions":"reuse topology","nodes":v["nodes"],"edges":v["edges"]}]);
+    let g: PatchGraph = serde_json::from_value(v).unwrap();
+    validate(&g).unwrap();
+    let mut next = g.clone();
+    next.templates.as_mut().unwrap()[0].instructions = "modified".into();
+    assert!(violations(&g, &next, &[])
+        .iter()
+        .any(|v| v.starts_with("template:")));
+}
+#[test]
+fn fingerprint_ignores_layout_but_tracks_contracts() {
+    let g = graph();
+    let fp = fingerprint(&g, &value(&g.edges[0]), false);
+    let mut next = g.clone();
+    next.nodes[0].x = 500.0;
+    next.nodes[1].y = -3.0;
+    assert_eq!(fp, fingerprint(&next, &value(&next.edges[0]), false));
+    next.edges[0].layer = Some("control".into());
+    assert_ne!(fp, fingerprint(&next, &value(&next.edges[0]), false));
+}
+#[test]
+fn disconnected_edges_and_dependency_cycles() {
+    let mut v = value(&graph());
+    v["edges"][0]["source"] = json!("");
+    v["edges"][0]["sourcePort"] = json!("");
+    v["edges"][0]["sourcePosition"] = json!({"x":-50,"y":100});
+    let g: PatchGraph = serde_json::from_value(v.clone()).unwrap();
+    validate(&g).unwrap();
+    let fp = fingerprint(&g, &value(&g.edges[0]), false);
+    v["edges"][0]["sourcePosition"]["x"] = json!(2);
+    let g: PatchGraph = serde_json::from_value(v.clone()).unwrap();
+    assert_eq!(fp, fingerprint(&g, &value(&g.edges[0]), false));
+    v["edges"][0]["execution"] = json!({"dispatch":"async","join":"all","after":["e"],"maxConcurrency":2,"timeoutMs":1000,"bufferSize":5,"overflow":"block","onError":"stop"});
+    assert!(validate(&serde_json::from_value(v).unwrap()).is_err());
+}
+#[test]
+fn bad_report_and_invalid_proposal() {
+    let (_d, mut s) = fixture();
+    let root = s.root.clone().unwrap();
+    fs::write(root.join("reports/e.json"), "{").unwrap();
+    assert_eq!(s.poll().unwrap()["reports"]["e"]["status"], "blocked");
+    fs::write(root.join("graph.json"), "invalid").unwrap();
+    let pending = s.poll().unwrap();
+    assert!(pending.get("error").is_some());
+    let mut reopened = Store::default();
+    assert!(reopened.open(&root).unwrap()["pendingExternal"]
+        .get("error")
+        .is_some());
+    s.reject(pending["diskRevision"].as_str().unwrap()).unwrap();
+}
+#[test]
+fn scoped_prompts_and_path_guard() {
+    let (_d, s) = fixture();
+    assert!(s.prompt(Some("e"), Some("a"), "en").is_err());
+    assert!(s.prompt(Some("missing"), None, "ja").is_err());
+    let p = s.prompt(None, Some("a"), "en").unwrap();
+    assert!(p.contains("context only"));
+    assert!(p
+        .replace('\\', "/")
+        .contains("components/nodes/a/report.json"));
+    assert!(safe(s.root.as_ref().unwrap(), "../outside").is_err());
+    assert!(safe(s.root.as_ref().unwrap(), "/outside").is_err());
+}
+#[cfg(unix)]
+#[test]
+fn symlink_output_cannot_escape() {
+    use std::os::unix::fs::symlink;
+    let (d, mut s) = fixture();
+    let outside = d.path().join("outside");
+    fs::create_dir(&outside).unwrap();
+    let root = s.root.clone().unwrap();
+    fs::remove_dir_all(root.join("connections")).unwrap();
+    symlink(&outside, root.join("connections")).unwrap();
+    let original = fs::read(root.join("graph.json")).unwrap();
+    let mut g = s.graph.clone().unwrap();
+    g.description = "must not save".into();
+    assert!(s.save(g, &s.revision.clone(), &[], true).is_err());
+    assert_eq!(original, fs::read(root.join("graph.json")).unwrap());
+    assert!(fs::read_dir(outside).unwrap().next().is_none());
+}
+#[test]
+fn failed_open_keeps_current_project() {
+    let (d, mut s) = fixture();
+    let root = s.root.clone();
+    fs::create_dir(d.path().join("bad")).unwrap();
+    fs::write(d.path().join("bad/graph.json"), "bad").unwrap();
+    assert!(s.open(&d.path().join("bad")).is_err());
+    assert_eq!(s.root, root);
+}
+#[test]
+fn node_implementation_protection_and_report() {
+    let (_d, mut s) = fixture();
+    let mut g = s.graph.clone().unwrap();
+    g.nodes[0].policy = Some("immutable".into());
+    s.save(g, &s.revision.clone(), &[], true).unwrap();
+    let root = s.root.clone().unwrap();
+    let dir = root.join("components/nodes/a/implementation");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("agent.py"), "changed").unwrap();
+    let fp = s.snapshot().unwrap()["nodeFingerprints"]["a"].clone();
+    fs::write(
+        root.join("components/nodes/a/report.json"),
+        json!({"fingerprint":fp,"status":"verified"}).to_string(),
+    )
+    .unwrap();
+    assert_eq!(s.poll().unwrap()["nodeReports"]["a"]["status"], "blocked");
+}

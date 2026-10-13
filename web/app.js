@@ -823,9 +823,9 @@ window.addEventListener('keydown',e=>{
   const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'');
   if(e.key==='Escape'){finishDrag(true);clearConnection();}
   if(e.code==='Space'&&!typing&&!$('#modal').open){e.preventDefault();spacePressed=true;$('#canvas').classList.add('pan-ready');}
-  if(e.metaKey&&e.key.toLowerCase()==='s'){e.preventDefault();document.activeElement?.blur();safe(()=>save(true))();}
-  if(e.metaKey&&e.key.toLowerCase()==='o'){e.preventDefault();$('#open-project').click();}
-  if(!typing&&!$('#modal').open&&!drag&&!connecting){if(e.metaKey&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}if(['Backspace','Delete'].includes(e.key)){e.preventDefault();safe(deleteSelected)();}if(e.key.toLowerCase()==='f')fit();}
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();document.activeElement?.blur();safe(()=>save(true))();}
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='o'){e.preventDefault();$('#open-project').click();}
+  if(!typing&&!$('#modal').open&&!drag&&!connecting){if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}if(['Backspace','Delete'].includes(e.key)){e.preventDefault();safe(deleteSelected)();}if(e.key.toLowerCase()==='f')fit();}
 });
 window.gacchanko={call,get graph(){return graph;},get root(){return root;},get reports(){return reports;},get nodeReports(){return nodeReports;},makeNode,mutate,createConnection,select,save,poll,cleanState,fit,render,exampleGraph,addPaths,undo,redo,status,replaceDraft,handoff,changeLanguage};
 async function init(){render();if(native){const state=await call('state');if(state.project){cleanState(state);fit();}else{try{const backup=JSON.parse(localStorage.getItem('gacchanko-draft')||'null');if(backup?.graph&&await confirmChoice(i18n.t('前回の未保存の編集を復元しますか？'))){graph=backup.graph;root='';revision='';markDirty();render();fit();}}catch(e){toast(e.message,true);}}}setInterval(poll,2000);}

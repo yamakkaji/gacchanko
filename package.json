@@ -1,0 +1,16 @@
+{
+  "name": "gacchanko",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build --features custom-protocol",
+    "tauri": "tauri",
+    "test:store": "cargo test --manifest-path src-tauri/Cargo.toml --no-default-features",
+    "test:ui": "node tests/run-ui.cjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "jsdom": "^26.0.0"
+  }
+}

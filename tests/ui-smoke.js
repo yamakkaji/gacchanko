@@ -112,9 +112,17 @@
   check(selectedIs('source'),'Shift click on empty canvas preserves selection');
   pointer(canvas,'pointerdown',500,300);pointer(window,'pointerup',500,300);
   check(selectedIs(),'click on empty canvas clears selection');
-  const arrow=document.querySelector('.edge-direction');
-  const arrowTransform=arrow.getAttribute('transform');
-  check(Math.cos(Number(arrowTransform.match(/rotate\(([^)]+)\)/)[1])*Math.PI/180)>0&&Math.abs(Number(arrowTransform.match(/scale\(([^)]+)\)/)[1])*transform()[2]-1)<1e-8,'out-to-in arrow points toward target and keeps screen size when zoomed out');
+  // CSSOM can round the serialized zoom, and edge decorations refresh after
+  // the zoom debounce. Wait for that refresh before comparing screen sizes.
+  const arrowMetrics=()=>{
+   const value=document.querySelector('.edge-direction')?.getAttribute('transform')||'';
+   return {angle:Number(value.match(/rotate\(([^)]+)\)/)?.[1]),scale:Number(value.match(/scale\(([^)]+)\)/)?.[1]),zoom:transform()[2]};
+  };
+  const deadline=Date.now()+2000;
+  while(Math.abs(arrowMetrics().scale*arrowMetrics().zoom-1)>1e-5&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20));
+  const arrow=arrowMetrics();
+  check(Math.cos(arrow.angle*Math.PI/180)>0,`out-to-in arrow points toward target (angle=${arrow.angle})`);
+  check(Math.abs(arrow.scale*arrow.zoom-1)<1e-5,`arrow keeps screen size when zoomed out (scale=${arrow.scale}, zoom=${arrow.zoom})`);
   const labelRect=document.querySelector('.edge-label-bg');
   check(Number(labelRect.getAttribute('y'))+26<178.5-5/transform()[2],'connection label clears the direction arrow on short horizontal edges');
   const targetNode=P.graph.nodes.find(n=>n.id==='target'),oldTargetX=targetNode.x;
@@ -184,7 +192,7 @@
   const denseCount=document.querySelectorAll('#edge-paths .edge-pattern').length;
   setting('spacing',120);
   check(document.querySelectorAll('#edge-paths .edge-pattern').length<denseCount,'pattern spacing changes the number of marks');
-  check(Math.abs(parseFloat(document.querySelector('#edge-paths .edge-line').style.strokeWidth)*transform()[2]-5)<1e-8,'custom line width remains constant on screen');
+  check(Math.abs(parseFloat(document.querySelector('#edge-paths .edge-line').style.strokeWidth)*transform()[2]-5)<1e-4,'custom line width remains constant on screen');
   setting('arrows',false);
   check(!document.querySelector('#edge-paths .edge-direction')&&document.querySelector('#edge-paths .edge-return'),'forward arrows can hide without losing request-response indication');
   setting('style','pattern');
@@ -211,5 +219,5 @@
     check(typeof detail.diff==='string'&&detail.diff.length>0,'Tauri native Git history diff');
   }
   await P.call('testFinish',{ok:true,checks,project:P.root});
- }catch(error){window.gacchankoAppearance.save(originalAppearance);await P.call('testFinish',{ok:false,checks,error:error.stack||String(error)});}
+ }catch(error){window.gacchankoAppearance.save(originalAppearance);await P.call('testFinish',{ok:false,checks,error:[String(error),error.stack].filter(Boolean).join('\n')});}
 })();

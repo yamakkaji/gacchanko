@@ -4,6 +4,13 @@ const base=path.resolve(__dirname,'..');const dir=fs.mkdtempSync(path.join(os.tm
 const html=fs.readFileSync(path.join(base,'web/index.html'),'utf8');
 const dom=new JSDOM(html,{url:'https://gacchanko.local/',runScripts:'outside-only',pretendToBeVisual:true});
 const w=dom.window;w.PointerEvent=w.MouseEvent;
+// Emulate native CSSOM serialization precision; jsdom otherwise preserves the
+// input string verbatim and hides over-strict zoom assertions in the smoke test.
+const transformProperty=Object.getOwnPropertyDescriptor(w.CSSStyleDeclaration.prototype,'transform');
+Object.defineProperty(w.CSSStyleDeclaration.prototype,'transform',{
+ ...transformProperty,
+ get(){return transformProperty.get.call(this).replace(/scale\(([-\d.]+)\)/g,(_,n)=>`scale(${Number(Number(n).toPrecision(6))})`);}
+});
 w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};
 w.HTMLElement.prototype.getBoundingClientRect=function(){return this.id==='canvas'?{x:226,y:142,left:226,top:142,right:1126,bottom:842,width:900,height:700}:{left:0,top:0,width:224,height:138};};
 let graph=null,revision='',reports={};
